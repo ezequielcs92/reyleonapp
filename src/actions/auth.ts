@@ -80,12 +80,20 @@ export async function signInWithGoogle() {
     try {
         const supabase = await createClient();
         const headersList = await headers();
-        const origin = headersList.get('origin') ?? '';
+
+        // Determinar la URL base correctamente, incluso en Vercel
+        const host = headersList.get('host');
+        const protocol = headersList.get('x-forwarded-proto') ?? (host?.includes('localhost') ? 'http' : 'https');
+        let baseUrl = headersList.get('origin');
+
+        if (!baseUrl) {
+            baseUrl = host ? `${protocol}://${host}` : (process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000');
+        }
 
         const { data, error } = await supabase.auth.signInWithOAuth({
             provider: 'google',
             options: {
-                redirectTo: `${origin}/auth/callback`,
+                redirectTo: `${baseUrl}/auth/callback?next=/feed`,
             },
         });
 
