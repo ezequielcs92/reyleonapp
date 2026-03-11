@@ -97,6 +97,11 @@ export async function signInWithGoogle() {
 }
 
 export async function logoutUser() {
-    const supabase = await createClient();
-    await supabase.auth.signOut();
+    try {
+        const supabase = await createClient();
+        await supabase.auth.signOut();
+        return { success: true };
+    } catch (e: any) {
+        return { error: e?.message || 'Error al cerrar sesión' };
+    }
 }
