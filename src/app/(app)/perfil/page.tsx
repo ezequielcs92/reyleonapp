@@ -1,15 +1,60 @@
 'use client';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { logoutUser } from '@/actions/auth';
 import { updateProfile, addLink, deleteLink, addWork, deleteWork } from '@/actions/profile';
 import { useRouter } from 'next/navigation';
-import { LogOut, Plus, Trash2, X, Globe, Instagram, Twitter, Youtube } from 'lucide-react';
+import { LogOut, Plus, Trash2, X, Globe, Instagram, Twitter, Youtube, Camera } from 'lucide-react';
+import Cropper, { Area, Point } from 'react-easy-crop';
 
 type Link = { id: string; type: string; label: string; url: string };
 type Work = { id: string; title: string; year: number; company: string; role: string; link?: string | null };
 type Prof = { full_name: string; stage_name?: string | null; bio?: string | null; role_in_show?: string | null; photo_url?: string | null };
+
+const MAX_PHOTO_SIZE_MB = 5;
+
+function createImage(url: string): Promise<HTMLImageElement> {
+    return new Promise((resolve, reject) => {
+        const image = new Image();
+        image.addEventListener('load', () => resolve(image));
+        image.addEventListener('error', error => reject(error));
+        image.src = url;
+    });
+}
+
+async function getCroppedBlob(imageSrc: string, cropPixels: Area, mimeType: string) {
+    const image = await createImage(imageSrc);
+    const canvas = document.createElement('canvas');
+    canvas.width = cropPixels.width;
+    canvas.height = cropPixels.height;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('No se pudo procesar la imagen');
+
+    ctx.drawImage(
+        image,
+        cropPixels.x,
+        cropPixels.y,
+        cropPixels.width,
+        cropPixels.height,
+        0,
+        0,
+        cropPixels.width,
+        cropPixels.height
+    );
+
+    return new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob(
+            blob => {
+                if (blob) resolve(blob);
+                else reject(new Error('No se pudo generar el recorte'));
+            },
+            mimeType,
+            0.92
+        );
+    });
+}
 
 const LINK_TYPES = [
     { value: 'instagram', label: 'Instagram' },
@@ -50,11 +95,21 @@ function Sheet({ open, onClose, title, children }: { open: boolean; onClose: () 
 export default function PerfilPage() {
     const { user, isAdmin, isSuperAdmin } = useAuth();
     const router = useRouter();
+    const fileInputRef = useRef<HTMLInputElement | null>(null);
 
     const [prof, setProf] = useState<Prof | null>(null);
     const [links, setLinks] = useState<Link[]>([]);
     const [works, setWorks] = useState<Work[]>([]);
     const [loading, setLoading] = useState(true);
+    const [uploadingPhoto, setUploadingPhoto] = useState(false);
+    const [photoError, setPhotoError] = useState('');
+    const [cropOpen, setCropOpen] = useState(false);
+    const [cropImageSrc, setCropImageSrc] = useState('');
+    const [cropMimeType, setCropMimeType] = useState('image/jpeg');
+    const [cropExt, setCropExt] = useState('jpg');
+    const [crop, setCrop] = useState<Point>({ x: 0, y: 0 });
+    const [zoom, setZoom] = useState(1);
+    const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
 
     // Edit basic info sheet
     const [editOpen, setEditOpen] = useState(false);
@@ -150,6 +205,91 @@ export default function PerfilPage() {
         router.push('/login');
     }
 
+    useEffect(() => {
+        return () => {
+            if (cropImageSrc) URL.revokeObjectURL(cropImageSrc);
+        };
+    }, [cropImageSrc]);
+
+    async function uploadPhoto(blob: Blob, ext: string, mimeType: string) {
+        if (!user) return;
+
+        setUploadingPhoto(true);
+        const path = `${user.id}/avatar.${ext}`;
+
+        const { error: uploadError } = await supabase.storage
+            .from('avatars')
+            .upload(path, blob, { upsert: true, contentType: mimeType });
+
+        if (uploadError) {
+            setUploadingPhoto(false);
+            setPhotoError('No se pudo subir la foto. Verificá que exista el bucket avatars.');
+            return;
+        }
+
+        const { data: publicData } = supabase.storage.from('avatars').getPublicUrl(path);
+        const publicUrl = `${publicData.publicUrl}?v=${Date.now()}`;
+
+        const { error: dbErr } = await supabase
+            .from('users')
+            .update({ photo_url: publicUrl })
+            .eq('uid', user.id);
+
+        setUploadingPhoto(false);
+
+        if (dbErr) {
+            setPhotoError(dbErr.message);
+            return;
+        }
+
+        setProf(prev => ({
+            ...(prev || { full_name: user.user_metadata?.full_name || 'Usuario' }),
+            photo_url: publicUrl,
+        }));
+    }
+
+    async function handlePhotoSelected(e: React.ChangeEvent<HTMLInputElement>) {
+        const file = e.target.files?.[0];
+        if (!file || !user) return;
+
+        setPhotoError('');
+
+        if (!file.type.startsWith('image/')) {
+            setPhotoError('Seleccioná una imagen válida');
+            return;
+        }
+
+        if (file.size > MAX_PHOTO_SIZE_MB * 1024 * 1024) {
+            setPhotoError(`La imagen debe pesar menos de ${MAX_PHOTO_SIZE_MB}MB`);
+            return;
+        }
+
+        if (cropImageSrc) URL.revokeObjectURL(cropImageSrc);
+        const objectUrl = URL.createObjectURL(file);
+        setCropImageSrc(objectUrl);
+        setCropMimeType(file.type || 'image/jpeg');
+        setCropExt(file.name.split('.').pop()?.toLowerCase() || 'jpg');
+        setCrop({ x: 0, y: 0 });
+        setZoom(1);
+        setCroppedAreaPixels(null);
+        setCropOpen(true);
+
+        if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+
+    async function handleSaveCrop() {
+        if (!cropImageSrc || !croppedAreaPixels) return;
+        try {
+            const blob = await getCroppedBlob(cropImageSrc, croppedAreaPixels, cropMimeType);
+            setCropOpen(false);
+            await uploadPhoto(blob, cropExt, cropMimeType);
+            URL.revokeObjectURL(cropImageSrc);
+            setCropImageSrc('');
+        } catch {
+            setPhotoError('No se pudo recortar la imagen');
+        }
+    }
+
     const displayName = prof?.full_name || user?.user_metadata?.full_name || 'Usuario';
     const email = user?.email || '';
     const photoUrl = prof?.photo_url || user?.user_metadata?.avatar_url;
@@ -163,11 +303,29 @@ export default function PerfilPage() {
             <div className="pf-content">
                 {/* Hero */}
                 <div className="pf-hero">
-                    {photoUrl ? (
-                        <img src={photoUrl} alt={displayName} className="pf-avatar-img" />
-                    ) : (
-                        <div className="pf-avatar">{initials(displayName)}</div>
-                    )}
+                    <div className="pf-avatar-wrap">
+                        {photoUrl ? (
+                            <img src={photoUrl} alt={displayName} className="pf-avatar-img" />
+                        ) : (
+                            <div className="pf-avatar">{initials(displayName)}</div>
+                        )}
+                        <button
+                            className="pf-avatar-edit"
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={uploadingPhoto}
+                        >
+                            <Camera size={14} />
+                            {uploadingPhoto ? 'Subiendo...' : 'Cambiar'}
+                        </button>
+                        <input
+                            ref={fileInputRef}
+                            className="pf-hidden-input"
+                            type="file"
+                            accept="image/*"
+                            onChange={handlePhotoSelected}
+                        />
+                    </div>
+                    {photoError && <p className="pf-photo-error">{photoError}</p>}
                     <div className="pf-name">{displayName}</div>
                     {prof?.stage_name && <div className="pf-stage">"{prof.stage_name}"</div>}
                     <div className="pf-email">{email}</div>
@@ -283,6 +441,41 @@ export default function PerfilPage() {
                 </button>
             </Sheet>
 
+            <Sheet open={cropOpen} onClose={() => setCropOpen(false)} title="Recortar foto">
+                <div className="crop-area-wrap">
+                    <div className="crop-area">
+                        {cropImageSrc && (
+                            <Cropper
+                                image={cropImageSrc}
+                                crop={crop}
+                                zoom={zoom}
+                                aspect={1}
+                                cropShape="rect"
+                                showGrid={true}
+                                onCropChange={setCrop}
+                                onZoomChange={setZoom}
+                                onCropComplete={(_, areaPixels) => setCroppedAreaPixels(areaPixels)}
+                            />
+                        )}
+                    </div>
+                    <div className="crop-controls">
+                        <span className="crop-label">Zoom</span>
+                        <input
+                            className="crop-zoom"
+                            type="range"
+                            min={1}
+                            max={3}
+                            step={0.01}
+                            value={zoom}
+                            onChange={e => setZoom(Number(e.target.value))}
+                        />
+                    </div>
+                    <button className="sheet-submit" onClick={handleSaveCrop} disabled={uploadingPhoto || !croppedAreaPixels}>
+                        {uploadingPhoto ? 'Guardando...' : 'Guardar foto'}
+                    </button>
+                </div>
+            </Sheet>
+
             {/* Add link sheet */}
             <Sheet open={linkOpen} onClose={() => setLinkOpen(false)} title="Agregar red social">
                 <label className="sheet-label">Plataforma</label>
@@ -356,16 +549,28 @@ export default function PerfilPage() {
     gap: 6px; padding: 28px 24px 24px;
     border-bottom: 1px solid rgba(255,255,255,0.05);
   }
+    .pf-avatar-wrap { position: relative; margin-bottom: 4px; }
   .pf-avatar {
     width: 76px; height: 76px; border-radius: 50%;
     background: linear-gradient(135deg, #d4a017, #7a5500);
     display: flex; align-items: center; justify-content: center;
-    font-size: 1.4rem; font-weight: 700; color: #0c0a08; margin-bottom: 4px;
+        font-size: 1.4rem; font-weight: 700; color: #0c0a08;
   }
   .pf-avatar-img {
     width: 76px; height: 76px; border-radius: 50%; object-fit: cover;
-    border: 2px solid rgba(212,160,23,0.35); margin-bottom: 4px;
+        border: 2px solid rgba(212,160,23,0.35);
   }
+    .pf-avatar-edit {
+        position: absolute; left: 50%; bottom: -11px; transform: translateX(-50%);
+        display: inline-flex; align-items: center; gap: 4px;
+        background: rgba(8,6,4,0.95); color: #d4a017;
+        border: 1px solid rgba(212,160,23,0.35); border-radius: 14px;
+        padding: 3px 8px; font-family: 'Poppins', sans-serif; font-size: 0.64rem; font-weight: 600;
+        cursor: pointer;
+    }
+    .pf-avatar-edit:disabled { opacity: 0.6; cursor: not-allowed; }
+    .pf-hidden-input { display: none; }
+    .pf-photo-error { margin: 10px 0 0; color: #fca5a5; font-size: 0.75rem; }
   .pf-name { font-size: 1.1rem; font-weight: 600; color: #fff; }
   .pf-stage { font-size: 0.82rem; color: rgba(212,160,23,0.8); font-style: italic; }
   .pf-email { font-size: 0.78rem; color: rgba(255,255,255,0.35); }
@@ -493,6 +698,19 @@ export default function PerfilPage() {
     cursor: pointer; margin-top: 4px; transition: opacity 0.15s;
   }
   .sheet-submit:disabled { opacity: 0.4; cursor: not-allowed; }
+    .crop-area-wrap { display: flex; flex-direction: column; gap: 14px; }
+    .crop-area {
+        position: relative;
+        width: 100%;
+        height: 320px;
+        background: #0b0907;
+        border: 1px solid rgba(255,255,255,0.08);
+        border-radius: 12px;
+        overflow: hidden;
+    }
+    .crop-controls { display: flex; align-items: center; gap: 10px; }
+    .crop-label { font-size: 0.78rem; color: rgba(255,255,255,0.5); min-width: 42px; }
+    .crop-zoom { width: 100%; accent-color: #d4a017; }
 `}</style>
         </div>
     );

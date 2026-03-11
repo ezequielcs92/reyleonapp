@@ -211,3 +211,38 @@ CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users
 
 CREATE TRIGGER update_config_updated_at BEFORE UPDATE ON config
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- Storage bucket for profile photos
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('avatars', 'avatars', true)
+ON CONFLICT (id) DO NOTHING;
+
+-- Storage policies for avatars
+CREATE POLICY "Avatar images are public" ON storage.objects
+FOR SELECT
+USING (bucket_id = 'avatars');
+
+CREATE POLICY "Users can upload own avatar" ON storage.objects
+FOR INSERT
+WITH CHECK (
+    bucket_id = 'avatars'
+    AND auth.uid()::text = (storage.foldername(name))[1]
+);
+
+CREATE POLICY "Users can update own avatar" ON storage.objects
+FOR UPDATE
+USING (
+    bucket_id = 'avatars'
+    AND auth.uid()::text = (storage.foldername(name))[1]
+)
+WITH CHECK (
+    bucket_id = 'avatars'
+    AND auth.uid()::text = (storage.foldername(name))[1]
+);
+
+CREATE POLICY "Users can delete own avatar" ON storage.objects
+FOR DELETE
+USING (
+    bucket_id = 'avatars'
+    AND auth.uid()::text = (storage.foldername(name))[1]
+);
