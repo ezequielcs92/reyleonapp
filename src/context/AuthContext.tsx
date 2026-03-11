@@ -10,6 +10,7 @@ interface AuthContextType {
     profile: UserProfile | null;
     loading: boolean;
     isAdmin: boolean;
+    isSuperAdmin: boolean;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -17,6 +18,7 @@ const AuthContext = createContext<AuthContextType>({
     profile: null,
     loading: true,
     isAdmin: false,
+    isSuperAdmin: false,
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -25,6 +27,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
     const [profile, setProfile] = useState<UserProfile | null>(null);
     const [isAdmin, setIsAdmin] = useState(false);
+    const [isSuperAdmin, setIsSuperAdmin] = useState(false);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -46,6 +49,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             } else {
                 setProfile(null);
                 setIsAdmin(false);
+                setIsSuperAdmin(false);
                 setLoading(false);
             }
         });
@@ -86,14 +90,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setProfile(profileData as UserProfile | null);
         }
 
-        // Check if admin
+        // Check if admin / super admin
         const { data: adminData } = await supabase
             .from('admins')
-            .select('uid')
+            .select('uid, super_admin')
             .eq('uid', userId)
             .single();
 
         setIsAdmin(!!adminData);
+        setIsSuperAdmin(!!adminData?.super_admin);
         setLoading(false);
 
         // Subscribe to profile changes
@@ -113,7 +118,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             .on('postgres_changes',
                 { event: '*', schema: 'public', table: 'admins', filter: `uid=eq.${userId}` },
                 (payload) => {
-                    setIsAdmin(payload.eventType !== 'DELETE');
+                    const isActive = payload.eventType !== 'DELETE';
+                    setIsAdmin(isActive);
+                    setIsSuperAdmin(isActive && !!(payload.new as any)?.super_admin);
                 }
             )
             .subscribe();
@@ -125,7 +132,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     return (
-        <AuthContext.Provider value={{ user, profile, loading, isAdmin }}>
+        <AuthContext.Provider value={{ user, profile, loading, isAdmin, isSuperAdmin }}>
             {loading ? (
                 <div className="flex items-center justify-center min-h-screen">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
