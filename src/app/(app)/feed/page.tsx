@@ -234,29 +234,42 @@ export default function FeedPage() {
     async function handlePost() {
         if (!postText.trim()) return;
         setSubmitting(true); setSubmitError('');
-        const fd = new FormData();
-        fd.append('description', postText);
-        const res = await createPost(fd);
-        setSubmitting(false);
-        if (res.error) { setSubmitError(res.error); return; }
-        setPostText(''); setComposeOpen(false);
-        loadFeed(true);
+        try {
+            const fd = new FormData();
+            fd.append('description', postText);
+            const res = await createPost(fd);
+            if (res?.error) { setSubmitError(res.error); return; }
+            setPostText('');
+            setComposeOpen(false);
+            loadFeed(true);
+        } catch {
+            setSubmitError('No se pudo publicar. Reintentá en unos segundos.');
+        } finally {
+            setSubmitting(false);
+        }
     }
 
     async function handlePoll() {
         const validOpts = options.filter(o => o.trim());
         if (!question.trim() || validOpts.length < 2) return;
         setSubmitting(true); setSubmitError('');
-        const fd = new FormData();
-        fd.append('question', question);
-        validOpts.forEach(o => fd.append('option', o));
-        fd.append('type', pollType);
-        fd.append('isAnonymous', String(isAnon));
-        const res = await createPoll(fd);
-        setSubmitting(false);
-        if (res.error) { setSubmitError(res.error); return; }
-        setQuestion(''); setOptions(['', '']); setComposeOpen(false);
-        loadFeed(true);
+        try {
+            const fd = new FormData();
+            fd.append('question', question);
+            validOpts.forEach(o => fd.append('option', o));
+            fd.append('type', pollType);
+            fd.append('isAnonymous', String(isAnon));
+            const res = await createPoll(fd);
+            if (res?.error) { setSubmitError(res.error); return; }
+            setQuestion('');
+            setOptions(['', '']);
+            setComposeOpen(false);
+            loadFeed(true);
+        } catch {
+            setSubmitError('No se pudo crear la encuesta. Reintentá en unos segundos.');
+        } finally {
+            setSubmitting(false);
+        }
     }
 
     function closeCompose() {
