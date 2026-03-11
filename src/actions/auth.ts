@@ -1,6 +1,7 @@
 'use server';
 
 import { createClient } from "@/lib/supabase-server";
+import { headers } from "next/headers";
 
 export async function registerUser(formData: FormData) {
     const email = formData.get('email') as string;
@@ -55,4 +56,47 @@ export async function registerUser(formData: FormData) {
         console.error('Registration Error:', error);
         return { error: error.message || 'Error al registrar usuario.' };
     }
+}
+
+export async function loginUser(formData: FormData) {
+    const email = formData.get('email') as string;
+    const password = formData.get('password') as string;
+
+    if (!email || !password) {
+        return { error: 'Email y contraseña son obligatorios.' };
+    }
+
+    try {
+        const supabase = await createClient();
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) return { error: error.message };
+        return { success: true };
+    } catch (error: any) {
+        return { error: error.message || 'Error al iniciar sesión.' };
+    }
+}
+
+export async function signInWithGoogle() {
+    try {
+        const supabase = await createClient();
+        const headersList = await headers();
+        const origin = headersList.get('origin') ?? '';
+
+        const { data, error } = await supabase.auth.signInWithOAuth({
+            provider: 'google',
+            options: {
+                redirectTo: `${origin}/auth/callback`,
+            },
+        });
+
+        if (error) return { error: error.message };
+        return { url: data.url };
+    } catch (error: any) {
+        return { error: error.message || 'Error al iniciar sesión con Google.' };
+    }
+}
+
+export async function logoutUser() {
+    const supabase = await createClient();
+    await supabase.auth.signOut();
 }

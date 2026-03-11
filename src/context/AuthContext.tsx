@@ -61,7 +61,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             .eq('uid', userId)
             .single();
 
-        setProfile(profileData as UserProfile | null);
+        // Auto-create profile for Google/OAuth users on first sign-in
+        if (!profileData) {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                const fullName = user.user_metadata?.full_name || user.user_metadata?.name || '';
+                await supabase.from('users').insert({
+                    uid: user.id,
+                    email: user.email,
+                    full_name: fullName,
+                    roles: [],
+                    skills: [],
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString(),
+                });
+                const { data: newProfile } = await supabase
+                    .from('users')
+                    .select('*')
+                    .eq('uid', userId)
+                    .single();
+                setProfile(newProfile as UserProfile | null);
+            }
+        } else {
+            setProfile(profileData as UserProfile | null);
+        }
 
         // Check if admin
         const { data: adminData } = await supabase
