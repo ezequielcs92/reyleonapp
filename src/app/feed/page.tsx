@@ -77,13 +77,13 @@ export default function FeedPage() {
 }
 
 const feedStyles = `
-  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:wght@300;400;500&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
 
   .feed-root {
     min-height: 100vh;
     background: #0c0a08;
-    font-family: 'DM Sans', sans-serif;
-    color: #f5e6c8;
+    font-family: 'Poppins', sans-serif;
+    color: #ffffff;
     position: relative;
   }
 
@@ -136,10 +136,10 @@ const feedStyles = `
   }
 
   .feed-logo-text {
-    font-family: 'Playfair Display', serif;
+    font-family: 'Poppins', sans-serif;
     font-size: 1.1rem;
     font-weight: 600;
-    color: #f5e6c8;
+    color: #ffffff;
     letter-spacing: 0.02em;
   }
 
@@ -189,8 +189,8 @@ const feedStyles = `
   .feed-logout-btn {
     background: transparent;
     border: 1px solid rgba(255,255,255,0.1);
-    color: rgba(245,230,200,0.5);
-    font-family: 'DM Sans', sans-serif;
+    color: rgba(255,255,255,0.5);
+    font-family: 'Poppins', sans-serif;
     font-size: 0.8rem;
     padding: 0.3rem 0.75rem;
     border-radius: 8px;
@@ -222,17 +222,17 @@ const feedStyles = `
   }
 
   .feed-welcome-title {
-    font-family: 'Playfair Display', serif;
+    font-family: 'Poppins', sans-serif;
     font-size: 2.2rem;
     font-weight: 700;
-    color: #f5e6c8;
+    color: #ffffff;
     margin: 0 0 0.5rem;
     letter-spacing: 0.01em;
   }
 
   .feed-welcome-sub {
     font-size: 0.95rem;
-    color: rgba(212,160,23,0.6);
+    color: rgba(255,255,255,0.5);
     margin: 0;
     font-weight: 300;
   }
@@ -264,10 +264,10 @@ const feedStyles = `
   }
 
   .feed-coming-card h3 {
-    font-family: 'Playfair Display', serif;
+    font-family: 'Poppins', sans-serif;
     font-size: 1rem;
     font-weight: 600;
-    color: #f5e6c8;
+    color: #ffffff;
     margin: 0 0 0.4rem;
   }
 

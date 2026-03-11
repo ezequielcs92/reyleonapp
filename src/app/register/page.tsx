@@ -164,7 +164,7 @@ function GoogleIcon() {
 }
 
 const authStyles = `
-  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:wght@300;400;500&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
 
   .auth-root {
     min-height: 100vh;
@@ -172,7 +172,7 @@ const authStyles = `
     align-items: center;
     justify-content: center;
     background: #0c0a08;
-    font-family: 'DM Sans', sans-serif;
+    font-family: 'Poppins', sans-serif;
     padding: 1.5rem;
     position: relative;
     overflow: hidden;
@@ -236,10 +236,10 @@ const authStyles = `
   }
 
   .auth-title {
-    font-family: 'Playfair Display', serif;
+    font-family: 'Poppins', sans-serif;
     font-size: 1.9rem;
     font-weight: 700;
-    color: #f5e6c8;
+    color: #ffffff;
     letter-spacing: 0.02em;
     line-height: 1;
     margin: 0 0 0.35rem;
@@ -248,7 +248,7 @@ const authStyles = `
   .auth-subtitle {
     font-size: 0.8rem;
     font-weight: 300;
-    color: rgba(212,160,23,0.7);
+    color: rgba(255,255,255,0.5);
     letter-spacing: 0.15em;
     text-transform: uppercase;
     margin: 0;
@@ -264,8 +264,8 @@ const authStyles = `
     background: rgba(255,255,255,0.04);
     border: 1px solid rgba(255,255,255,0.1);
     border-radius: 10px;
-    color: #e8dcc8;
-    font-family: 'DM Sans', sans-serif;
+    color: #ffffff;
+    font-family: 'Poppins', sans-serif;
     font-size: 0.9rem;
     font-weight: 500;
     cursor: pointer;
@@ -316,7 +316,7 @@ const authStyles = `
   .auth-label {
     font-size: 0.78rem;
     font-weight: 500;
-    color: rgba(245,230,200,0.6);
+    color: rgba(255,255,255,0.6);
     letter-spacing: 0.04em;
   }
 
@@ -326,15 +326,15 @@ const authStyles = `
     background: rgba(255,255,255,0.04);
     border: 1px solid rgba(255,255,255,0.1);
     border-radius: 9px;
-    color: #f5e6c8;
-    font-family: 'DM Sans', sans-serif;
+    color: #ffffff;
+    font-family: 'Poppins', sans-serif;
     font-size: 0.9rem;
     transition: border-color 0.2s, background 0.2s;
     outline: none;
     box-sizing: border-box;
   }
 
-  .auth-input::placeholder { color: rgba(245,230,200,0.2); }
+  .auth-input::placeholder { color: rgba(255,255,255,0.2); }
 
   .auth-input:focus {
     border-color: rgba(212,160,23,0.5);
@@ -358,7 +358,7 @@ const authStyles = `
     border: none;
     border-radius: 10px;
     color: #0c0a08;
-    font-family: 'DM Sans', sans-serif;
+    font-family: 'Poppins', sans-serif;
     font-size: 0.9rem;
     font-weight: 600;
     cursor: pointer;
@@ -384,7 +384,7 @@ const authStyles = `
   .auth-footer-text {
     text-align: center;
     font-size: 0.82rem;
-    color: rgba(245,230,200,0.4);
+    color: rgba(255,255,255,0.4);
     margin: 1.5rem 0 0;
   }
 
