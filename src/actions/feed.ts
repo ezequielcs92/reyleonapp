@@ -57,15 +57,21 @@ export async function createPoll(formData: FormData) {
                 total_votes: 0,
             })
             .select().single();
-
-        if (pollError) return { error: pollError.message };
+        if (pollError) {
+            console.error('[createPoll] Supabase error:', pollError);
+            return { error: pollError.message, code: pollError.code };
+        }
 
         const { error: optErr } = await supabase.from('poll_options').insert(
             options.map((text, i) => ({ poll_id: poll.id, text, votes_count: 0, position: i }))
         );
-        if (optErr) return { error: optErr.message };
+        if (optErr) {
+            console.error('[createPoll] poll_options error:', optErr);
+            return { error: optErr.message, code: optErr.code };
+        }
         return { success: true };
     } catch (e: any) {
-        return { error: e?.message || 'Error al crear encuesta' };
+        console.error('[createPoll] Exception:', e);
+        return { error: e?.message || 'Error al crear encuesta', stack: e?.stack };
     }
 }

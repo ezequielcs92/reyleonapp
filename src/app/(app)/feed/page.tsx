@@ -1,17 +1,26 @@
 'use client';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
-import { createPost, createPoll } from '@/actions/feed';
-import { Heart, Plus, X, BarChart2, RefreshCw } from 'lucide-react';
+import { Heart, Plus, X, BarChart2, RefreshCw, Image as ImageIcon, MessageSquare, Send } from 'lucide-react';
 
 // ── Types ──────────────────────────────────────────────────────
 type PollOption = { id: string; text: string; votes_count: number; position: number };
+
+type PostComment = {
+    id: string;
+    user_id: string;
+    user_name: string;
+    user_photo_url: string | null;
+    content: string;
+    created_at: string;
+};
 
 type PostItem = {
     itemType: 'post';
     id: string; author_id: string; author_name: string;
     author_photo_url: string | null; description: string;
+    image_url: string | null;
     likes_count: number; pinned: boolean; created_at: string;
     isLiked: boolean;
 };
@@ -49,6 +58,67 @@ function Avatar({ name, url }: { name: string; url?: string | null }) {
 
 // ── Post Card ──────────────────────────────────────────────────
 function PostCard({ item, onLike }: { item: PostItem; onLike: (id: string, liked: boolean) => void }) {
+    const [showHeartAnim, setShowHeartAnim] = useState(false);
+    const [showComments, setShowComments] = useState(false);
+    const [comments, setComments] = useState<PostComment[]>([]);
+    const [loadingComments, setLoadingComments] = useState(false);
+    const [newComment, setNewComment] = useState('');
+    const [postingComment, setPostingComment] = useState(false);
+
+    const handleDoubleTap = () => {
+        if (!item.isLiked) {
+            onLike(item.id, false);
+        }
+        setShowHeartAnim(true);
+        setTimeout(() => setShowHeartAnim(false), 800);
+    };
+
+    const toggleComments = async () => {
+        if (!showComments) {
+            setShowComments(true);
+            setLoadingComments(true);
+            try {
+                const { data, error } = await supabase
+                    .from('post_comments')
+                    .select('*')
+                    .eq('post_id', item.id)
+                    .order('created_at', { ascending: true });
+                if (!error && data) {
+                    setComments(data);
+                }
+            } catch (e) {
+                console.error(e);
+            } finally {
+                setLoadingComments(false);
+            }
+        } else {
+            setShowComments(false);
+        }
+    };
+
+    const handlePostComment = async () => {
+        if (!newComment.trim()) return;
+        setPostingComment(true);
+        try {
+            const res = await fetch('/api/feed/comment', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ postId: item.id, content: newComment }),
+            });
+            const data = await res.json();
+            if (data.success && data.comment) {
+                setComments(prev => [...prev, data.comment]);
+                setNewComment('');
+            } else {
+                alert(data.error || 'Error al comentar. Verifica que la tabla post_comments existe.');
+            }
+        } catch (e) {
+            alert('Error de red al comentar.');
+        } finally {
+            setPostingComment(false);
+        }
+    };
+
     return (
         <article className="feed-card">
             <div className="card-avatar-col">
@@ -62,6 +132,16 @@ function PostCard({ item, onLike }: { item: PostItem; onLike: (id: string, liked
                     {item.pinned && <span className="card-pin">📌</span>}
                 </div>
                 <p className="card-text">{item.description}</p>
+                {item.image_url && (
+                    <div className="card-image-wrap" onDoubleClick={handleDoubleTap}>
+                        <img src={item.image_url} alt="Imagen" className="card-image" loading="lazy" />
+                        {showHeartAnim && (
+                            <div className="anim-heart">
+                                <Heart size={80} fill="#fff" color="#fff" />
+                            </div>
+                        )}
+                    </div>
+                )}
                 <div className="card-actions">
                     <button
                         className={`card-like${item.isLiked ? ' liked' : ''}`}
@@ -70,7 +150,45 @@ function PostCard({ item, onLike }: { item: PostItem; onLike: (id: string, liked
                         <Heart size={16} fill={item.isLiked ? '#ef4444' : 'none'} color={item.isLiked ? '#ef4444' : 'rgba(255,255,255,0.4)'} />
                         {item.likes_count > 0 && <span>{item.likes_count}</span>}
                     </button>
+                    <button className="card-action-btn" onClick={toggleComments}>
+                        <MessageSquare size={16} />
+                    </button>
                 </div>
+
+                {/* Comments Section */}
+                {showComments && (
+                    <div className="comments-section">
+                        {loadingComments ? (
+                            <p className="comments-loading">Cargando comentarios...</p>
+                        ) : comments.length === 0 ? (
+                            <p className="comments-empty">Sé el primero en comentar.</p>
+                        ) : (
+                            <div className="comments-list">
+                                {comments.map(c => (
+                                    <div key={c.id} className="comment-item">
+                                        <div className="comment-avatar"><Avatar name={c.user_name} url={c.user_photo_url} /></div>
+                                        <div className="comment-content">
+                                            <span className="comment-name">{c.user_name}</span>
+                                            <p className="comment-text">{c.content}</p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                        <div className="comment-input-wrap">
+                            <input
+                                className="comment-input"
+                                placeholder="Escribe un comentario..."
+                                value={newComment}
+                                onChange={e => setNewComment(e.target.value)}
+                                onKeyDown={e => e.key === 'Enter' && handlePostComment()}
+                            />
+                            <button className="comment-send" onClick={handlePostComment} disabled={!newComment.trim() || postingComment}>
+                                <Send size={14} />
+                            </button>
+                        </div>
+                    </div>
+                )}
             </div>
         </article>
     );
@@ -139,9 +257,12 @@ export default function FeedPage() {
     const [tab, setTab] = useState<'post' | 'poll'>('post');
     const [submitting, setSubmitting] = useState(false);
     const [submitError, setSubmitError] = useState('');
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Post compose state
     const [postText, setPostText] = useState('');
+    const [imageFile, setImageFile] = useState<File | null>(null);
+    const [imagePreview, setImagePreview] = useState<string | null>(null);
     // Poll compose state
     const [question, setQuestion] = useState('');
     const [options, setOptions] = useState(['', '']);
@@ -232,14 +353,25 @@ export default function FeedPage() {
     }
 
     async function handlePost() {
-        if (!postText.trim()) return;
+        if (!postText.trim() && !imageFile) return;
         setSubmitting(true); setSubmitError('');
         try {
             const fd = new FormData();
-            fd.append('description', postText);
-            const res = await createPost(fd);
-            if (res?.error) { setSubmitError(res.error); return; }
+            if (postText.trim()) fd.append('description', postText);
+            else fd.append('description', 'Imagen adjuunta'); // Fallback text if empty
+
+            if (imageFile) {
+                fd.append('image', imageFile);
+            }
+
+            const res = await fetch('/api/feed/post', {
+                method: 'POST',
+                body: fd,
+            });
+            const data = await res.json();
+            if (data?.error) { setSubmitError(data.error); return; }
             setPostText('');
+            handleRemoveImage();
             setComposeOpen(false);
             loadFeed(true);
         } catch {
@@ -254,13 +386,18 @@ export default function FeedPage() {
         if (!question.trim() || validOpts.length < 2) return;
         setSubmitting(true); setSubmitError('');
         try {
-            const fd = new FormData();
-            fd.append('question', question);
-            validOpts.forEach(o => fd.append('option', o));
-            fd.append('type', pollType);
-            fd.append('isAnonymous', String(isAnon));
-            const res = await createPoll(fd);
-            if (res?.error) { setSubmitError(res.error); return; }
+            const res = await fetch('/api/feed/poll', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    question,
+                    options: validOpts,
+                    type: pollType,
+                    isAnonymous: isAnon,
+                }),
+            });
+            const data = await res.json();
+            if (data?.error) { setSubmitError(data.error); return; }
             setQuestion('');
             setOptions(['', '']);
             setComposeOpen(false);
@@ -272,9 +409,26 @@ export default function FeedPage() {
         }
     }
 
+    function handleImagePick(e: React.ChangeEvent<HTMLInputElement>) {
+        if (e.target.files && e.target.files[0]) {
+            const file = e.target.files[0];
+            setImageFile(file);
+            setImagePreview(URL.createObjectURL(file));
+        }
+    }
+
+    function handleRemoveImage() {
+        if (imagePreview) URL.revokeObjectURL(imagePreview);
+        setImageFile(null);
+        setImagePreview(null);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+
     function closeCompose() {
         setComposeOpen(false);
         setSubmitError('');
+        setPostText('');
+        handleRemoveImage();
     }
 
     return (
@@ -342,11 +496,31 @@ export default function FeedPage() {
                                     autoFocus
                                     rows={4}
                                 />
+                                {imagePreview && (
+                                    <div className="compose-img-preview">
+                                        <img src={imagePreview} alt="Preview" />
+                                        <button className="preview-rm" onClick={handleRemoveImage}>
+                                            <X size={14} />
+                                        </button>
+                                    </div>
+                                )}
                                 {submitError && <p className="compose-error">{submitError}</p>}
                                 <div className="compose-footer">
-                                    <span className="compose-count">{postText.length}/500</span>
+                                    <div className="compose-left-actions">
+                                        <input
+                                            type="file"
+                                            accept="image/jpeg, image/jpg, image/png, image/webp"
+                                            ref={fileInputRef}
+                                            style={{ display: 'none' }}
+                                            onChange={handleImagePick}
+                                        />
+                                        <button className="compose-img-btn" onClick={() => fileInputRef.current?.click()}>
+                                            <ImageIcon size={18} />
+                                        </button>
+                                        <span className="compose-count">{postText.length}/500</span>
+                                    </div>
                                     <button className="compose-submit" onClick={handlePost}
-                                        disabled={!postText.trim() || submitting}>
+                                        disabled={(!postText.trim() && !imageFile) || submitting}>
                                         {submitting ? '...' : 'Publicar'}
                                     </button>
                                 </div>
@@ -492,8 +666,10 @@ const pageStyles = `
     padding: 1px 7px; margin-left: 2px;
   }
   .card-text { font-size: 0.9rem; color: rgba(255,255,255,0.9); line-height: 1.5; margin: 0 0 10px; word-break: break-word; }
+  .card-image-wrap { margin-bottom: 12px; border-radius: 12px; overflow: hidden; border: 1px solid rgba(255,255,255,0.08); background: #000; position: relative; user-select: none; }
+  .card-image { width: 100%; max-height: 400px; object-fit: contain; display: block; }
   .card-actions { display: flex; gap: 16px; }
-  .card-like {
+  .card-like, .card-action-btn {
     display: flex; align-items: center; gap: 5px;
     background: transparent; border: none; cursor: pointer;
     color: rgba(255,255,255,0.4); font-size: 0.8rem;
@@ -501,9 +677,43 @@ const pageStyles = `
     padding: 4px 0; min-height: 32px;
     transition: color 0.15s;
   }
-  .card-like:hover { color: #ef4444; }
-  .card-like.liked { color: #ef4444; }
-    .card-like.liked { cursor: default; }
+  .card-like:hover, .card-action-btn:hover { color: #ef4444; }
+  .card-like.liked { color: #ef4444; cursor: default; }
+  .anim-heart {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0);
+    opacity: 0; pointer-events: none; animation: popHeart 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    filter: drop-shadow(0 4px 10px rgba(0,0,0,0.5));
+  }
+  @keyframes popHeart {
+    0% { transform: translate(-50%, -50%) scale(0); opacity: 0; }
+    15% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
+    30% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+    70% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+    100% { transform: translate(-50%, -50%) scale(1.5); opacity: 0; }
+  }
+
+  /* Comments */
+  .comments-section { margin-top: 12px; padding-top: 12px; border-top: 1px dashed rgba(255,255,255,0.06); }
+  .comments-loading, .comments-empty { font-size: 0.8rem; color: rgba(255,255,255,0.3); text-align: center; margin-bottom: 12px; }
+  .comments-list { display: flex; flex-direction: column; gap: 12px; margin-bottom: 12px; max-height: 300px; overflow-y: auto; }
+  .comment-item { display: flex; gap: 8px; }
+  .comment-avatar .c-avatar, .comment-avatar .c-avatar-img { width: 28px; height: 28px; font-size: 0.55rem; }
+  .comment-content { flex: 1; background: rgba(255,255,255,0.03); padding: 8px 12px; border-radius: 0 12px 12px 12px; }
+  .comment-name { display: block; font-size: 0.75rem; font-weight: 600; color: #d4a017; margin-bottom: 2px; }
+  .comment-text { font-size: 0.8rem; color: #fff; margin: 0; line-height: 1.4; word-break: break-word; }
+  .comment-input-wrap { display: flex; gap: 8px; align-items: center; }
+  .comment-input {
+    flex: 1; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 20px; padding: 8px 14px; color: #fff; font-size: 0.8rem; outline: none; transition: border-color 0.15s;
+    font-family: 'Poppins', sans-serif;
+  }
+  .comment-input:focus { border-color: rgba(212,160,23,0.4); }
+  .comment-send {
+    background: #d4a017; color: #000; border: none; width: 32px; height: 32px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center; cursor: pointer; transition: transform 0.1s;
+  }
+  .comment-send:disabled { opacity: 0.4; cursor: not-allowed; }
+  .comment-send:not(:disabled):hover { transform: scale(1.05); }
 
   /* Poll options */
   .poll-options-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }
@@ -614,7 +824,14 @@ const pageStyles = `
     border-radius: 8px; padding: 8px 12px;
     color: #fca5a5; font-size: 0.78rem; margin: 0;
   }
-  .compose-footer { display: flex; justify-content: space-between; align-items: center; }
+  .compose-img-preview { position: relative; display: inline-block; margin-top: 4px; border-radius: 12px; overflow: hidden; max-height: 150px; background: #000; border: 1px solid rgba(255,255,255,0.1); }
+  .compose-img-preview img { height: 100%; max-height: 150px; width: auto; display: block; object-fit: cover; }
+  .preview-rm { position: absolute; top: 6px; right: 6px; background: rgba(0,0,0,0.6); border: none; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; color: #fff; cursor: pointer; backdrop-filter: blur(4px); transition: background 0.15s; }
+  .preview-rm:hover { background: rgba(239,68,68,0.8); }
+  .compose-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 4px; }
+  .compose-left-actions { display: flex; align-items: center; gap: 12px; }
+  .compose-img-btn { background: transparent; border: none; color: #d4a017; padding: 6px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background 0.15s; margin-left: -6px; }
+  .compose-img-btn:hover { background: rgba(212,160,23,0.1); }
   .compose-count { font-size: 0.75rem; color: rgba(255,255,255,0.25); }
   .compose-submit {
     background: linear-gradient(135deg, #d4a017, #b8860b);
