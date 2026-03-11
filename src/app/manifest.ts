@@ -2,13 +2,14 @@ import type { MetadataRoute } from 'next'
 
 export default function manifest(): MetadataRoute.Manifest {
     return {
-        name: 'El Rey León - Grupo de Teatro',
+        name: 'Rey León - Elenco',
         short_name: 'Rey León',
-        description: 'App oficial para el grupo de teatro El Rey León',
-        start_url: '/',
+        description: 'App oficial para el elenco de El Rey León',
+        start_url: '/feed',
         display: 'standalone',
-        background_color: '#ffffff',
-        theme_color: '#000000',
+        orientation: 'portrait',
+        background_color: '#0c0a08',
+        theme_color: '#0c0a08',
         icons: [
             {
                 src: '/web-app-manifest-192x192.png',
