@@ -195,6 +195,9 @@ export default function FeedPage() {
     useEffect(() => { loadFeed(); }, [loadFeed]);
 
     async function handleLike(postId: string, isLiked: boolean) {
+        // Like solo suma: si ya esta likeado, no hacemos nada.
+        if (isLiked) return;
+
         // Optimistic
         setItems(prev => prev.map(i =>
             i.itemType === 'post' && i.id === postId
@@ -487,6 +490,7 @@ const pageStyles = `
   }
   .card-like:hover { color: #ef4444; }
   .card-like.liked { color: #ef4444; }
+    .card-like.liked { cursor: default; }
 
   /* Poll options */
   .poll-options-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }
