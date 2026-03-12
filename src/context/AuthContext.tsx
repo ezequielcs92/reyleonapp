@@ -5,6 +5,24 @@ import { User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import type { UserProfile } from '@/types';
 
+function mapProfile(data: any): UserProfile | null {
+    if (!data) return null;
+    return {
+        uid: data.uid,
+        email: data.email,
+        fullName: data.full_name || data.fullName,
+        stageName: data.stage_name || data.stageName,
+        photoUrl: data.photo_url || data.photoUrl,
+        bio: data.bio,
+        roleInShow: data.role_in_show || data.roleInShow,
+        roles: data.roles || [],
+        skills: data.skills || [],
+        birthdate: data.birthdate,
+        createdAt: data.created_at || data.createdAt,
+        updatedAt: data.updated_at || data.updatedAt,
+    };
+}
+
 interface AuthContextType {
     user: User | null;
     profile: UserProfile | null;
@@ -84,19 +102,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     .select('*')
                     .eq('uid', userId)
                     .single();
-                setProfile(newProfile as UserProfile | null);
+                setProfile(mapProfile(newProfile));
             }
         } else {
-            setProfile(profileData as UserProfile | null);
+            setProfile(mapProfile(profileData));
         }
 
         // Check if admin / super admin
-        const { data: adminData } = await supabase
+        console.log('Checking admin status for UID:', userId);
+        const { data: adminData, error: adminError } = await supabase
             .from('admins')
             .select('uid, super_admin')
             .eq('uid', userId)
             .single();
 
+        if (adminError && adminError.code !== 'PGRST116') {
+            console.error('Admin check error:', adminError);
+        }
+
+        console.log('Admin data response:', adminData);
         setIsAdmin(!!adminData);
         setIsSuperAdmin(!!adminData?.super_admin);
         setLoading(false);
@@ -107,7 +131,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             .on('postgres_changes', 
                 { event: '*', schema: 'public', table: 'users', filter: `uid=eq.${userId}` },
                 (payload) => {
-                    setProfile(payload.new as UserProfile);
+                    setProfile(mapProfile(payload.new));
                 }
             )
             .subscribe();

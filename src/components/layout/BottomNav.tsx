@@ -1,10 +1,11 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Store, User } from 'lucide-react';
+import { Home, Store, User, Calendar } from 'lucide-react';
 
 const TABS = [
     { href: '/feed', label: 'Inicio', Icon: Home },
+    { href: '/calendario', label: 'Eventos', Icon: Calendar },
     { href: '/negocios', label: 'Negocios', Icon: Store },
     { href: '/perfil', label: 'Perfil', Icon: User },
 ];

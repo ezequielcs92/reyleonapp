@@ -10,6 +10,7 @@ export interface UserProfile {
   skills: string[]; // e.g., ["Singing", "Acrobatics"]
   createdAt: string; // ISO string
   updatedAt: string;
+  birthdate?: string;
 }
 
 export interface UserLink {

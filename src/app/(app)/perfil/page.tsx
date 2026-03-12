@@ -5,12 +5,12 @@ import { supabase } from '@/lib/supabase';
 import { logoutUser } from '@/actions/auth';
 import { updateProfile, addLink, deleteLink, addWork, deleteWork } from '@/actions/profile';
 import { useRouter } from 'next/navigation';
-import { LogOut, Plus, Trash2, X, Globe, Instagram, Twitter, Youtube, Camera } from 'lucide-react';
+import { LogOut, Plus, Trash2, X, Globe, Instagram, Twitter, Youtube, Camera, Shield } from 'lucide-react';
 import Cropper, { Area, Point } from 'react-easy-crop';
 
 type Link = { id: string; type: string; label: string; url: string };
 type Work = { id: string; title: string; year: number; company: string; role: string; link?: string | null };
-type Prof = { full_name: string; stage_name?: string | null; bio?: string | null; role_in_show?: string | null; photo_url?: string | null };
+type Prof = { full_name: string; stage_name?: string | null; bio?: string | null; role_in_show?: string | null; photo_url?: string | null; birthdate?: string | null; };
 
 const MAX_PHOTO_SIZE_MB = 5;
 
@@ -93,11 +93,10 @@ function Sheet({ open, onClose, title, children }: { open: boolean; onClose: () 
 }
 
 export default function PerfilPage() {
-    const { user, isAdmin, isSuperAdmin } = useAuth();
+    const { user, profile: prof, isAdmin, isSuperAdmin } = useAuth();
     const router = useRouter();
     const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-    const [prof, setProf] = useState<Prof | null>(null);
     const [links, setLinks] = useState<Link[]>([]);
     const [works, setWorks] = useState<Work[]>([]);
     const [loading, setLoading] = useState(true);
@@ -113,7 +112,7 @@ export default function PerfilPage() {
 
     // Edit basic info sheet
     const [editOpen, setEditOpen] = useState(false);
-    const [editForm, setEditForm] = useState({ full_name: '', stage_name: '', bio: '', role_in_show: '' });
+    const [editForm, setEditForm] = useState({ full_name: '', stage_name: '', bio: '', role_in_show: '', birthdate: '' });
     const [editSubmitting, setEditSubmitting] = useState(false);
     const [editError, setEditError] = useState('');
 
@@ -131,12 +130,10 @@ export default function PerfilPage() {
 
     const loadData = useCallback(async () => {
         if (!user) return;
-        const [pr, lr, wr] = await Promise.all([
-            supabase.from('users').select('full_name, stage_name, bio, role_in_show, photo_url').eq('uid', user.id).single(),
+        const [lr, wr] = await Promise.all([
             supabase.from('user_links').select('*').eq('user_id', user.id).order('created_at'),
             supabase.from('user_work').select('*').eq('user_id', user.id).order('year', { ascending: false }),
         ]);
-        setProf(pr.data);
         setLinks(lr.data || []);
         setWorks(wr.data || []);
         setLoading(false);
@@ -146,10 +143,11 @@ export default function PerfilPage() {
 
     function openEdit() {
         setEditForm({
-            full_name: prof?.full_name || '',
-            stage_name: prof?.stage_name || '',
+            full_name: prof?.fullName || '',
+            stage_name: prof?.stageName || '',
             bio: prof?.bio || '',
-            role_in_show: prof?.role_in_show || '',
+            role_in_show: prof?.roleInShow || '',
+            birthdate: prof?.birthdate || '',
         });
         setEditError('');
         setEditOpen(true);
@@ -163,7 +161,6 @@ export default function PerfilPage() {
         setEditSubmitting(false);
         if (res.error) { setEditError(res.error); return; }
         setEditOpen(false);
-        loadData();
     }
 
     async function handleAddLink() {
@@ -241,11 +238,6 @@ export default function PerfilPage() {
             setPhotoError(dbErr.message);
             return;
         }
-
-        setProf(prev => ({
-            ...(prev || { full_name: user.user_metadata?.full_name || 'Usuario' }),
-            photo_url: publicUrl,
-        }));
     }
 
     async function handlePhotoSelected(e: React.ChangeEvent<HTMLInputElement>) {
@@ -290,9 +282,9 @@ export default function PerfilPage() {
         }
     }
 
-    const displayName = prof?.full_name || user?.user_metadata?.full_name || 'Usuario';
+    const displayName = prof?.fullName || user?.user_metadata?.full_name || 'Usuario';
     const email = user?.email || '';
-    const photoUrl = prof?.photo_url || user?.user_metadata?.avatar_url;
+    const photoUrl = prof?.photoUrl || user?.user_metadata?.avatar_url;
 
     return (
         <div className="pf-root">
@@ -327,12 +319,21 @@ export default function PerfilPage() {
                     </div>
                     {photoError && <p className="pf-photo-error">{photoError}</p>}
                     <div className="pf-name">{displayName}</div>
-                    {prof?.stage_name && <div className="pf-stage">"{prof.stage_name}"</div>}
                     <div className="pf-email">{email}</div>
                     <div className="pf-badges">
                         {isSuperAdmin && <span className="badge-super">SUPER ADMIN</span>}
-                        {isAdmin && !isSuperAdmin && <span className="badge-admin">ADMIN</span>}
-                        {prof?.role_in_show && <span className="badge-role">{prof.role_in_show}</span>}
+                        {isAdmin && !isSuperAdmin && (
+                            <div className="pf-badge admin-badge">
+                                <Shield size={14} className="badge-icon" />
+                                Administrador
+                            </div>
+                        )}
+                        {prof?.roleInShow && <span className="badge-character">🎭 {prof.roleInShow}</span>}
+                        {prof?.birthdate && (
+                            <span className="badge-role" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                🎂 {new Date(prof.birthdate + 'T00:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'long' })}
+                            </span>
+                        )}
                     </div>
                     <button className="pf-edit-btn" onClick={openEdit}>Editar perfil</button>
                 </div>
@@ -425,7 +426,11 @@ export default function PerfilPage() {
                 <input className="sheet-input" placeholder='Ej: "El Simba"' value={editForm.stage_name}
                     onChange={e => setEditForm(f => ({ ...f, stage_name: e.target.value }))} />
 
-                <label className="sheet-label">Rol en el show</label>
+                <label className="sheet-label">Cumpleaños</label>
+                <input className="sheet-input" type="date" value={editForm.birthdate}
+                    onChange={e => setEditForm(f => ({ ...f, birthdate: e.target.value }))} />
+
+                <label className="sheet-label">Personaje / Rol</label>
                 <input className="sheet-input" placeholder="Ej: Simba, Ensemble..." value={editForm.role_in_show}
                     onChange={e => setEditForm(f => ({ ...f, role_in_show: e.target.value }))} />
 
@@ -589,6 +594,11 @@ export default function PerfilPage() {
     background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.55);
     font-size: 0.62rem; font-weight: 500; padding: 3px 10px; border-radius: 20px;
     border: 1px solid rgba(255,255,255,0.1);
+  }
+  .badge-character {
+    background: rgba(212,160,23,0.15); color: #fff;
+    border: 1px solid rgba(212,160,23,0.5); font-size: 0.65rem;
+    font-weight: 700; padding: 3px 10px; border-radius: 20px;
   }
   .pf-edit-btn {
     margin-top: 10px;

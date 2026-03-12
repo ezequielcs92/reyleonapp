@@ -36,7 +36,15 @@ type PollItem = {
     hasVoted: boolean; myVoteIds: string[];
 };
 
-type FeedItem = PostItem | PollItem;
+type BirthdayItem = {
+    itemType: 'birthday';
+    id: string;
+    full_name: string;
+    photo_url: string | null;
+    birthdate: string;
+};
+
+type FeedItem = PostItem | PollItem | BirthdayItem;
 
 // ── Helpers ────────────────────────────────────────────────────
 function timeAgo(d: string) {
@@ -247,6 +255,24 @@ function PollCard({ item, onVote }: { item: PollItem; onVote: (pollId: string, o
     );
 }
 
+// ── Birthday Banner ───────────────────────────────────────────
+function BirthdayBanner({ item }: { item: BirthdayItem }) {
+    return (
+        <article className="feed-card" style={{ background: 'linear-gradient(135deg, rgba(212,160,23,0.15), rgba(212,160,23,0.05))', borderColor: 'rgba(212,160,23,0.4)', alignItems: 'center' }}>
+            <div className="card-avatar-col" style={{ position: 'relative' }}>
+                <Avatar name={item.full_name} url={item.photo_url} />
+                <span style={{ position: 'absolute', bottom: -5, right: -5, fontSize: '1rem' }}>🎉</span>
+            </div>
+            <div className="card-body">
+                <div className="card-meta">
+                    <span className="card-name" style={{ color: '#d4a017' }}>¡Cumpleaños de {item.full_name}! 🎂</span>
+                </div>
+                <p className="card-text" style={{ fontSize: '0.85rem' }}>Deseale un feliz día cuando te lo cruces en el teatro.</p>
+            </div>
+        </article>
+    );
+}
+
 // ── Main Page ──────────────────────────────────────────────────
 export default function FeedPage() {
     const { user } = useAuth();
@@ -273,7 +299,7 @@ export default function FeedPage() {
         if (!user) return;
         if (!quiet) setLoading(true); else setRefreshing(true);
 
-        const [postsRes, pollsRes, likesRes, votesRes] = await Promise.all([
+        const [postsRes, pollsRes, likesRes, votesRes, usersRes] = await Promise.all([
             supabase.from('posts').select('*')
                 .order('pinned', { ascending: false })
                 .order('created_at', { ascending: false })
@@ -284,6 +310,7 @@ export default function FeedPage() {
                 .limit(100),
             supabase.from('post_likes').select('post_id').eq('user_id', user.id),
             supabase.from('poll_votes').select('poll_id, option_id').eq('user_id', user.id),
+            supabase.from('users').select('uid, full_name, photo_url, birthdate').not('birthdate', 'is', null)
         ]);
 
         const likedIds = new Set(likesRes.data?.map(l => l.post_id) || []);
@@ -302,10 +329,36 @@ export default function FeedPage() {
             myVoteIds: votedMap[p.id] || [],
         }));
 
-        const merged = [...posts, ...polls].sort((a, b) => {
-            if (a.pinned && !b.pinned) return -1;
-            if (!a.pinned && b.pinned) return 1;
-            return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        let birthdays: BirthdayItem[] = [];
+        if (usersRes.data) {
+            const today = new Date();
+            const currentMonth = today.getMonth();
+            const currentDate = today.getDate();
+            
+            birthdays = usersRes.data.filter(u => {
+                if (!u.birthdate) return false;
+                // Extraer el mes y dia (timezone utc trick sumando 12h)
+                const d = new Date(u.birthdate + 'T12:00:00Z');
+                return d.getMonth() === currentMonth && d.getDate() === currentDate;
+            }).map(u => ({
+                itemType: 'birthday',
+                id: `bday-${u.uid}`,
+                full_name: u.full_name,
+                photo_url: u.photo_url,
+                birthdate: u.birthdate,
+            }));
+        }
+
+        const merged = [...birthdays, ...posts, ...polls].sort((a, b) => {
+            if (a.itemType === 'birthday' && b.itemType !== 'birthday') return -1;
+            if (a.itemType !== 'birthday' && b.itemType === 'birthday') return 1;
+
+            if ('pinned' in a && 'pinned' in b) {
+                if (a.pinned && !b.pinned) return -1;
+                if (!a.pinned && b.pinned) return 1;
+                return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+            }
+            return 0;
         });
 
         setItems(merged);
@@ -460,11 +513,12 @@ export default function FeedPage() {
                         <p className="fp-empty-sub">¡Sé el primero en compartir algo!</p>
                     </div>
                 ) : (
-                    items.map(item =>
-                        item.itemType === 'post'
-                            ? <PostCard key={item.id} item={item} onLike={handleLike} />
-                            : <PollCard key={item.id} item={item} onVote={handleVote} />
-                    )
+                    items.map(item => {
+                        if (item.itemType === 'post') return <PostCard key={item.id} item={item} onLike={handleLike} />;
+                        if (item.itemType === 'poll') return <PollCard key={item.id} item={item} onVote={handleVote} />;
+                        if (item.itemType === 'birthday') return <BirthdayBanner key={item.id} item={item} />;
+                        return null;
+                    })
                 )}
             </main>
 

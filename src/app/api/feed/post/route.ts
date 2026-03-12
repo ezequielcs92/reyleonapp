@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase-server';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
+import sharp from 'sharp';
 
 export async function POST(request: NextRequest) {
     try {
@@ -28,17 +29,28 @@ export async function POST(request: NextRequest) {
                 process.env.SUPABASE_SERVICE_ROLE_KEY!
             );
 
-            const fileExt = imageFile.name.split('.').pop();
+            const fileExt = 'webp';
             const fileName = `${user.id}-${Date.now()}.${fileExt}`;
             const filePath = `posts/${fileName}`; // Changed to a folder to keep it organized
 
             const arrayBuffer = await imageFile.arrayBuffer();
-            const buffer = new Uint8Array(arrayBuffer);
+            const originalBuffer = Buffer.from(arrayBuffer);
+            
+            // Process the image: resize if too large and convert to WebP to reduce size
+            const processedBuffer = await sharp(originalBuffer)
+                .resize({
+                    width: 1200, // Max width
+                    height: 1200, // Max height
+                    fit: sharp.fit.inside,
+                    withoutEnlargement: true
+                })
+                .webp({ quality: 80 }) // 80% quality is a good balance
+                .toBuffer();
 
             const { data: uploadData, error: uploadError } = await adminSupabase.storage
                 .from('post-images')
-                .upload(filePath, buffer, {
-                    contentType: imageFile.type,
+                .upload(filePath, processedBuffer, {
+                    contentType: 'image/webp',
                     upsert: true,
                 });
 

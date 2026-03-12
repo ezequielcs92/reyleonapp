@@ -15,6 +15,7 @@ export async function updateProfile(formData: FormData) {
             stage_name: (formData.get('stage_name') as string)?.trim() || null,
             bio: (formData.get('bio') as string)?.trim() || null,
             role_in_show: (formData.get('role_in_show') as string)?.trim() || null,
+            birthdate: (formData.get('birthdate') as string)?.trim() || null,
         }).eq('uid', user.id);
 
         if (error) return { error: error.message };
