@@ -1,20 +1,14 @@
 'use client';
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { memo, useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
-import { Heart, Plus, X, BarChart2, RefreshCw, Image as ImageIcon, MessageSquare, Send } from 'lucide-react';
+import { initials, timeAgo } from '@/lib/utils';
+import type { DbNotificationItem, DbPostComment } from '@/types';
+import { Heart, Plus, X, BarChart2, RefreshCw, Image as ImageIcon, MessageSquare, Send, Pin, PinOff, Bell, EyeOff, Eye, Trash2 } from 'lucide-react';
+import './feed.css';
 
 // ── Types ──────────────────────────────────────────────────────
 type PollOption = { id: string; text: string; votes_count: number; position: number };
-
-type PostComment = {
-    id: string;
-    user_id: string;
-    user_name: string;
-    user_photo_url: string | null;
-    content: string;
-    created_at: string;
-};
 
 type PostItem = {
     itemType: 'post';
@@ -22,6 +16,7 @@ type PostItem = {
     author_photo_url: string | null; description: string;
     image_url: string | null;
     likes_count: number; pinned: boolean; created_at: string;
+    hidden_by_admin?: boolean;
     isLiked: boolean;
 };
 
@@ -31,6 +26,7 @@ type PollItem = {
     question: string; type: 'single' | 'multi';
     is_anonymous: boolean; show_results: string;
     closes_at: string | null; pinned: boolean;
+    hidden_by_admin?: boolean;
     total_votes: number; created_at: string;
     poll_options: PollOption[];
     hasVoted: boolean; myVoteIds: string[];
@@ -46,18 +42,6 @@ type BirthdayItem = {
 
 type FeedItem = PostItem | PollItem | BirthdayItem;
 
-// ── Helpers ────────────────────────────────────────────────────
-function timeAgo(d: string) {
-    const diff = Date.now() - new Date(d).getTime();
-    if (diff < 60000) return 'ahora';
-    if (diff < 3600000) return `${Math.floor(diff / 60000)}m`;
-    if (diff < 86400000) return `${Math.floor(diff / 3600000)}h`;
-    return `${Math.floor(diff / 86400000)}d`;
-}
-function initials(name: string) {
-    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
-}
-
 // ── Avatar ─────────────────────────────────────────────────────
 function Avatar({ name, url }: { name: string; url?: string | null }) {
     if (url) return <img src={url} alt={name} className="c-avatar-img" />;
@@ -65,10 +49,10 @@ function Avatar({ name, url }: { name: string; url?: string | null }) {
 }
 
 // ── Post Card ──────────────────────────────────────────────────
-function PostCard({ item, onLike }: { item: PostItem; onLike: (id: string, liked: boolean) => void }) {
+const PostCard = memo(function PostCard({ item, onLike, canPin, onTogglePin, canModerate, onModerate }: { item: PostItem; onLike: (id: string, liked: boolean) => void; canPin: boolean; onTogglePin: (itemType: 'post' | 'poll', id: string, pinned: boolean) => void; canModerate: boolean; onModerate: (itemType: 'post' | 'poll', id: string, action: 'hide' | 'restore' | 'delete') => void; }) {
     const [showHeartAnim, setShowHeartAnim] = useState(false);
     const [showComments, setShowComments] = useState(false);
-    const [comments, setComments] = useState<PostComment[]>([]);
+    const [comments, setComments] = useState<DbPostComment[]>([]);
     const [loadingComments, setLoadingComments] = useState(false);
     const [newComment, setNewComment] = useState('');
     const [postingComment, setPostingComment] = useState(false);
@@ -120,7 +104,7 @@ function PostCard({ item, onLike }: { item: PostItem; onLike: (id: string, liked
             } else {
                 alert(data.error || 'Error al comentar. Verifica que la tabla post_comments existe.');
             }
-        } catch (e) {
+        } catch {
             alert('Error de red al comentar.');
         } finally {
             setPostingComment(false);
@@ -136,8 +120,15 @@ function PostCard({ item, onLike }: { item: PostItem; onLike: (id: string, liked
                 <div className="card-meta">
                     <span className="card-name">{item.author_name}</span>
                     <span className="card-dot">·</span>
-                    <span className="card-time">{timeAgo(item.created_at)}</span>
+                    <span className="card-time">{timeAgo(item.created_at, { compact: true })}</span>
                     {item.pinned && <span className="card-pin">📌</span>}
+                    {canPin && (
+                        <button className={`card-pin-btn${item.pinned ? ' pinned' : ''}`} onClick={() => onTogglePin('post', item.id, item.pinned)}>
+                            {item.pinned ? <PinOff size={13} /> : <Pin size={13} />}
+                            {item.pinned ? 'Desfijar' : 'Fijar'}
+                        </button>
+                    )}
+                    {item.hidden_by_admin && <span className="card-hidden-badge">Oculto</span>}
                 </div>
                 <p className="card-text">{item.description}</p>
                 {item.image_url && (
@@ -161,6 +152,16 @@ function PostCard({ item, onLike }: { item: PostItem; onLike: (id: string, liked
                     <button className="card-action-btn" onClick={toggleComments}>
                         <MessageSquare size={16} />
                     </button>
+                    {canModerate && (
+                        <>
+                            <button className="card-action-btn admin-mod" onClick={() => onModerate('post', item.id, item.hidden_by_admin ? 'restore' : 'hide')}>
+                                {item.hidden_by_admin ? <Eye size={16} /> : <EyeOff size={16} />}
+                            </button>
+                            <button className="card-action-btn admin-mod delete" onClick={() => onModerate('post', item.id, 'delete')}>
+                                <Trash2 size={16} />
+                            </button>
+                        </>
+                    )}
                 </div>
 
                 {/* Comments Section */}
@@ -200,10 +201,10 @@ function PostCard({ item, onLike }: { item: PostItem; onLike: (id: string, liked
             </div>
         </article>
     );
-}
+});
 
 // ── Poll Card ──────────────────────────────────────────────────
-function PollCard({ item, onVote }: { item: PollItem; onVote: (pollId: string, optionId: string) => void }) {
+const PollCard = memo(function PollCard({ item, onVote, canPin, onTogglePin, canModerate, onModerate }: { item: PollItem; onVote: (pollId: string, optionId: string) => void; canPin: boolean; onTogglePin: (itemType: 'post' | 'poll', id: string, pinned: boolean) => void; canModerate: boolean; onModerate: (itemType: 'post' | 'poll', id: string, action: 'hide' | 'restore' | 'delete') => void; }) {
     const isExpired = item.closes_at ? new Date(item.closes_at) < new Date() : false;
     const canVote = !item.hasVoted && !isExpired;
     const showResults = item.hasVoted || item.show_results === 'always';
@@ -218,8 +219,15 @@ function PollCard({ item, onVote }: { item: PollItem; onVote: (pollId: string, o
                 <div className="card-meta">
                     <span className="card-name">{displayName}</span>
                     <span className="card-dot">·</span>
-                    <span className="card-time">{timeAgo(item.created_at)}</span>
+                    <span className="card-time">{timeAgo(item.created_at, { compact: true })}</span>
                     {item.pinned && <span className="card-pin">📌</span>}
+                    {canPin && (
+                        <button className={`card-pin-btn${item.pinned ? ' pinned' : ''}`} onClick={() => onTogglePin('poll', item.id, item.pinned)}>
+                            {item.pinned ? <PinOff size={13} /> : <Pin size={13} />}
+                            {item.pinned ? 'Desfijar' : 'Fijar'}
+                        </button>
+                    )}
+                    {item.hidden_by_admin && <span className="card-hidden-badge">Oculta</span>}
                     <span className="card-poll-badge"><BarChart2 size={11} /> Encuesta</span>
                 </div>
                 <p className="card-text" style={{ fontWeight: 500 }}>{item.question}</p>
@@ -250,10 +258,21 @@ function PollCard({ item, onVote }: { item: PollItem; onVote: (pollId: string, o
                     {item.total_votes} {item.total_votes === 1 ? 'voto' : 'votos'}
                     {isExpired && <span className="poll-closed"> · Cerrada</span>}
                 </p>
+                {canModerate && (
+                    <div className="card-actions admin-actions-row">
+                        <button className="card-action-btn admin-mod" onClick={() => onModerate('poll', item.id, item.hidden_by_admin ? 'restore' : 'hide')}>
+                            {item.hidden_by_admin ? <Eye size={16} /> : <EyeOff size={16} />}
+                            {item.hidden_by_admin ? 'Restaurar' : 'Ocultar'}
+                        </button>
+                        <button className="card-action-btn admin-mod delete" onClick={() => onModerate('poll', item.id, 'delete')}>
+                            <Trash2 size={16} /> Eliminar
+                        </button>
+                    </div>
+                )}
             </div>
         </article>
     );
-}
+});
 
 // ── Birthday Banner ───────────────────────────────────────────
 function BirthdayBanner({ item }: { item: BirthdayItem }) {
@@ -275,7 +294,7 @@ function BirthdayBanner({ item }: { item: BirthdayItem }) {
 
 // ── Main Page ──────────────────────────────────────────────────
 export default function FeedPage() {
-    const { user } = useAuth();
+    const { user, isAdmin } = useAuth();
     const [items, setItems] = useState<FeedItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -283,7 +302,12 @@ export default function FeedPage() {
     const [tab, setTab] = useState<'post' | 'poll'>('post');
     const [submitting, setSubmitting] = useState(false);
     const [submitError, setSubmitError] = useState('');
+    const [notifOpen, setNotifOpen] = useState(false);
+    const [notifications, setNotifications] = useState<DbNotificationItem[]>([]);
+    const [notifUnread, setNotifUnread] = useState(0);
+    const [notifLoading, setNotifLoading] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const feedReloadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // Post compose state
     const [postText, setPostText] = useState('');
@@ -349,7 +373,10 @@ export default function FeedPage() {
             }));
         }
 
-        const merged = [...birthdays, ...posts, ...polls].sort((a, b) => {
+        const visiblePosts = isAdmin ? posts : posts.filter(p => !p.hidden_by_admin);
+        const visiblePolls = isAdmin ? polls : polls.filter(p => !p.hidden_by_admin);
+
+        const merged = [...birthdays, ...visiblePosts, ...visiblePolls].sort((a, b) => {
             if (a.itemType === 'birthday' && b.itemType !== 'birthday') return -1;
             if (a.itemType !== 'birthday' && b.itemType === 'birthday') return 1;
 
@@ -364,11 +391,218 @@ export default function FeedPage() {
         setItems(merged);
         setLoading(false);
         setRefreshing(false);
-    }, [user]);
+    }, [user, isAdmin]);
 
     useEffect(() => { loadFeed(); }, [loadFeed]);
 
-    async function handleLike(postId: string, isLiked: boolean) {
+    const scheduleFeedReload = useCallback(() => {
+        if (feedReloadTimerRef.current) {
+            clearTimeout(feedReloadTimerRef.current);
+        }
+
+        feedReloadTimerRef.current = setTimeout(() => {
+            loadFeed(true);
+        }, 250);
+    }, [loadFeed]);
+
+    const loadNotifications = useCallback(async () => {
+        if (!user) return;
+        setNotifLoading(true);
+        try {
+            const res = await fetch('/api/notifications', { method: 'GET' });
+            const data = await res.json();
+            if (!res.ok || data?.error) return;
+
+            setNotifications(Array.isArray(data?.notifications) ? data.notifications : []);
+            setNotifUnread(typeof data?.unread === 'number' ? data.unread : 0);
+        } catch {
+            // noop
+        } finally {
+            setNotifLoading(false);
+        }
+    }, [user]);
+
+    async function markAllNotificationsRead() {
+        try {
+            await fetch('/api/notifications/mark-read', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ all: true }),
+            });
+            setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+            setNotifUnread(0);
+        } catch {
+            // noop
+        }
+    }
+
+    const syncBirthdaysAndNotifications = useCallback(async () => {
+        if (!user) return;
+        try {
+            await fetch('/api/notifications/sync-birthdays', { method: 'POST' });
+        } catch {
+            // noop
+        }
+        await loadNotifications();
+    }, [user, loadNotifications]);
+
+    useEffect(() => {
+        if (!user) return;
+        syncBirthdaysAndNotifications();
+
+        const notifChannel = supabase
+            .channel(`notifications:${user.id}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: 'INSERT',
+                    schema: 'public',
+                    table: 'notifications',
+                    filter: `user_id=eq.${user.id}`,
+                },
+                () => {
+                    loadNotifications();
+                }
+            )
+            .on(
+                'postgres_changes',
+                {
+                    event: 'UPDATE',
+                    schema: 'public',
+                    table: 'notifications',
+                    filter: `user_id=eq.${user.id}`,
+                },
+                () => {
+                    loadNotifications();
+                }
+            )
+            .subscribe((status) => {
+                if (status === 'SUBSCRIBED') {
+                    loadNotifications();
+                }
+            });
+
+        const interval = setInterval(() => {
+            loadNotifications();
+        }, 300000);
+
+        return () => {
+            clearInterval(interval);
+            supabase.removeChannel(notifChannel);
+        };
+    }, [user, loadNotifications, syncBirthdaysAndNotifications]);
+
+    useEffect(() => {
+        if (!user) return;
+
+        const feedChannel = supabase
+            .channel('feed:live')
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'posts' },
+                () => scheduleFeedReload()
+            )
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'polls' },
+                () => scheduleFeedReload()
+            )
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'poll_options' },
+                () => scheduleFeedReload()
+            )
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'post_likes' },
+                () => scheduleFeedReload()
+            )
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'poll_votes' },
+                () => scheduleFeedReload()
+            )
+            .subscribe((status) => {
+                if (status === 'SUBSCRIBED') {
+                    loadFeed(true);
+                }
+            });
+
+        return () => {
+            if (feedReloadTimerRef.current) {
+                clearTimeout(feedReloadTimerRef.current);
+            }
+            supabase.removeChannel(feedChannel);
+        };
+    }, [user, scheduleFeedReload, loadFeed]);
+
+    const handleTogglePin = useCallback(async (itemType: 'post' | 'poll', id: string, currentPinned: boolean) => {
+        if (!isAdmin) return;
+
+        const nextPinned = !currentPinned;
+
+        setItems(prev => prev.map(i => {
+            if (itemType === 'post' && i.itemType === 'post' && i.id === id) return { ...i, pinned: nextPinned };
+            if (itemType === 'poll' && i.itemType === 'poll' && i.id === id) return { ...i, pinned: nextPinned };
+            return i;
+        }));
+
+        try {
+            const res = await fetch('/api/feed/pin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ itemType, id, pinned: nextPinned }),
+            });
+            const data = await res.json();
+            if (!res.ok || data?.error) {
+                throw new Error(data?.error || 'No se pudo fijar/desfijar');
+            }
+            await loadFeed(true);
+            await loadNotifications();
+        } catch (e: unknown) {
+            setItems(prev => prev.map(i => {
+                if (itemType === 'post' && i.itemType === 'post' && i.id === id) return { ...i, pinned: currentPinned };
+                if (itemType === 'poll' && i.itemType === 'poll' && i.id === id) return { ...i, pinned: currentPinned };
+                return i;
+            }));
+            const msg = e instanceof Error ? e.message : 'No se pudo fijar/desfijar';
+            setSubmitError(msg);
+        }
+    }, [isAdmin, loadFeed, loadNotifications]);
+
+    const handleModeration = useCallback(async (itemType: 'post' | 'poll', id: string, action: 'hide' | 'restore' | 'delete') => {
+        if (!isAdmin) return;
+
+        const messages = {
+            hide: 'ocultar',
+            restore: 'restaurar',
+            delete: 'eliminar definitivamente',
+        };
+
+        if (!confirm(`¿Querés ${messages[action]} este ${itemType === 'post' ? 'post' : 'encuesta'}?`)) {
+            return;
+        }
+
+        try {
+            const res = await fetch('/api/feed/moderate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ itemType, id, action }),
+            });
+            const data = await res.json();
+
+            if (!res.ok || data?.error) {
+                throw new Error(data?.error || 'No se pudo moderar el contenido');
+            }
+
+            await loadFeed(true);
+        } catch (e: unknown) {
+            const msg = e instanceof Error ? e.message : 'No se pudo moderar el contenido';
+            setSubmitError(msg);
+        }
+    }, [isAdmin, loadFeed]);
+
+    const handleLike = useCallback(async (postId: string, isLiked: boolean) => {
         // Like solo suma: si ya esta likeado, no hacemos nada.
         if (isLiked) return;
 
@@ -387,9 +621,9 @@ export default function FeedPage() {
                     : i
             ));
         }
-    }
+    }, []);
 
-    async function handleVote(pollId: string, optionId: string) {
+    const handleVote = useCallback(async (pollId: string, optionId: string) => {
         // Optimistic
         setItems(prev => prev.map(i => {
             if (i.itemType !== 'poll' || i.id !== pollId) return i;
@@ -403,7 +637,7 @@ export default function FeedPage() {
         }));
         const { error } = await supabase.rpc('vote_on_poll', { p_poll_id: pollId, p_option_id: optionId });
         if (error) loadFeed(true); // Revert on error
-    }
+    }, [loadFeed]);
 
     async function handlePost() {
         if (!postText.trim() && !imageFile) return;
@@ -491,6 +725,10 @@ export default function FeedPage() {
                 <span className="fp-crown">♛</span>
                 <span className="fp-title">Rey León</span>
                 <div className="fp-header-actions">
+                    <button className="fp-bell" onClick={() => setNotifOpen(v => !v)}>
+                        <Bell size={18} />
+                        {notifUnread > 0 && <span className="fp-bell-badge">{notifUnread > 99 ? '99+' : notifUnread}</span>}
+                    </button>
                     <button className="fp-refresh" onClick={() => loadFeed(true)} disabled={refreshing}>
                         <RefreshCw size={18} className={refreshing ? 'spinning' : ''} />
                     </button>
@@ -514,13 +752,39 @@ export default function FeedPage() {
                     </div>
                 ) : (
                     items.map(item => {
-                        if (item.itemType === 'post') return <PostCard key={item.id} item={item} onLike={handleLike} />;
-                        if (item.itemType === 'poll') return <PollCard key={item.id} item={item} onVote={handleVote} />;
+                        if (item.itemType === 'post') return <PostCard key={item.id} item={item} onLike={handleLike} canPin={isAdmin} onTogglePin={handleTogglePin} canModerate={isAdmin} onModerate={handleModeration} />;
+                        if (item.itemType === 'poll') return <PollCard key={item.id} item={item} onVote={handleVote} canPin={isAdmin} onTogglePin={handleTogglePin} canModerate={isAdmin} onModerate={handleModeration} />;
                         if (item.itemType === 'birthday') return <BirthdayBanner key={item.id} item={item} />;
                         return null;
                     })
                 )}
             </main>
+
+            {notifOpen && (
+                <div className="notif-overlay" onClick={() => setNotifOpen(false)}>
+                    <div className="notif-sheet" onClick={e => e.stopPropagation()}>
+                        <div className="notif-head">
+                            <h3>Notificaciones</h3>
+                            <button className="notif-mark-all" onClick={markAllNotificationsRead}>Marcar todo leido</button>
+                        </div>
+                        <div className="notif-list">
+                            {notifLoading ? (
+                                <p className="notif-empty">Cargando...</p>
+                            ) : notifications.length === 0 ? (
+                                <p className="notif-empty">No tienes notificaciones por ahora.</p>
+                            ) : (
+                                notifications.map(n => (
+                                    <a key={n.id} href={n.link || '#'} className={`notif-item${n.read ? '' : ' unread'}`} onClick={() => setNotifOpen(false)}>
+                                        <div className="notif-title">{n.title}</div>
+                                        <div className="notif-msg">{n.message}</div>
+                                        <div className="notif-time">{timeAgo(n.created_at, { compact: true })}</div>
+                                    </a>
+                                ))
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Compose sheet */}
             {composeOpen && (
@@ -633,268 +897,6 @@ export default function FeedPage() {
                 </div>
             )}
 
-            <style>{pageStyles}</style>
         </div>
     );
 }
-
-const pageStyles = `
-  .fp-root { min-height: 100dvh; background: #0c0a08; font-family: 'Poppins', sans-serif; }
-
-  /* Header */
-  .fp-header {
-    position: sticky; top: 0; z-index: 20;
-    display: flex; align-items: center; gap: 8px;
-    padding: 0 16px;
-    height: 52px;
-    background: rgba(12,10,8,0.92);
-    border-bottom: 1px solid rgba(255,255,255,0.06);
-    backdrop-filter: blur(12px);
-  }
-  .fp-crown { font-size: 1.1rem; color: #d4a017; text-shadow: 0 0 10px rgba(212,160,23,0.4); }
-  .fp-title { font-size: 1rem; font-weight: 600; color: #fff; flex: 1; letter-spacing: 0.01em; }
-  .fp-header-actions { display: flex; align-items: center; gap: 8px; }
-  .fp-refresh {
-    background: transparent; border: none; color: rgba(255,255,255,0.4);
-    cursor: pointer; padding: 8px; border-radius: 50%;
-    display: flex; align-items: center; justify-content: center;
-  }
-  .fp-refresh:hover { color: #fff; }
-  .spinning { animation: spin 0.8s linear infinite; }
-  @keyframes spin { to { transform: rotate(360deg); } }
-  .fp-fab {
-    width: 36px; height: 36px; border-radius: 50%;
-    background: linear-gradient(135deg, #d4a017, #b8860b);
-    border: none; color: #0c0a08; cursor: pointer;
-    display: flex; align-items: center; justify-content: center;
-    box-shadow: 0 2px 8px rgba(212,160,23,0.3);
-    transition: transform 0.15s, opacity 0.15s;
-  }
-  .fp-fab:hover { transform: scale(1.06); }
-
-  /* Skeletons */
-  .fp-skeletons { padding: 8px 0; }
-  .fp-skeleton {
-    margin: 0 16px 12px;
-    height: 80px; border-radius: 14px;
-    background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.07) 50%, rgba(255,255,255,0.04) 75%);
-    background-size: 200% 100%;
-    animation: shimmer 1.4s infinite;
-  }
-  @keyframes shimmer { to { background-position: -200% 0; } }
-
-  /* Empty */
-  .fp-empty { text-align: center; padding: 64px 24px; color: rgba(255,255,255,0.3); font-size: 0.9rem; }
-  .fp-empty-icon { font-size: 2.5rem; color: rgba(212,160,23,0.3); margin-bottom: 12px; }
-  .fp-empty-sub { font-size: 0.8rem; margin-top: 4px; }
-
-  /* Cards */
-  .feed-card {
-    display: flex; gap: 12px;
-    padding: 14px 16px;
-    border-bottom: 1px solid rgba(255,255,255,0.05);
-    transition: background 0.15s;
-  }
-  .feed-card:active { background: rgba(255,255,255,0.02); }
-  .card-avatar-col { flex-shrink: 0; }
-  .c-avatar {
-    width: 40px; height: 40px; border-radius: 50%;
-    background: linear-gradient(135deg, #d4a017, #7a5500);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 0.7rem; font-weight: 700; color: #0c0a08;
-  }
-  .c-avatar-img {
-    width: 40px; height: 40px; border-radius: 50%;
-    object-fit: cover; border: 1px solid rgba(255,255,255,0.08);
-  }
-  .card-body { flex: 1; min-width: 0; }
-  .card-meta { display: flex; align-items: center; gap: 5px; margin-bottom: 4px; flex-wrap: wrap; }
-  .card-name { font-size: 0.85rem; font-weight: 600; color: #fff; }
-  .card-dot { color: rgba(255,255,255,0.25); font-size: 0.7rem; }
-  .card-time { font-size: 0.78rem; color: rgba(255,255,255,0.4); }
-  .card-pin { font-size: 0.75rem; }
-  .card-poll-badge {
-    display: inline-flex; align-items: center; gap: 3px;
-    font-size: 0.65rem; color: #d4a017; font-weight: 500;
-    background: rgba(212,160,23,0.1); border-radius: 20px;
-    padding: 1px 7px; margin-left: 2px;
-  }
-  .card-text { font-size: 0.9rem; color: rgba(255,255,255,0.9); line-height: 1.5; margin: 0 0 10px; word-break: break-word; }
-  .card-image-wrap { margin-bottom: 12px; border-radius: 12px; overflow: hidden; border: 1px solid rgba(255,255,255,0.08); background: #000; position: relative; user-select: none; }
-  .card-image { width: 100%; max-height: 400px; object-fit: contain; display: block; }
-  .card-actions { display: flex; gap: 16px; }
-  .card-like, .card-action-btn {
-    display: flex; align-items: center; gap: 5px;
-    background: transparent; border: none; cursor: pointer;
-    color: rgba(255,255,255,0.4); font-size: 0.8rem;
-    font-family: 'Poppins', sans-serif;
-    padding: 4px 0; min-height: 32px;
-    transition: color 0.15s;
-  }
-  .card-like:hover, .card-action-btn:hover { color: #ef4444; }
-  .card-like.liked { color: #ef4444; cursor: default; }
-  .anim-heart {
-    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0);
-    opacity: 0; pointer-events: none; animation: popHeart 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-    filter: drop-shadow(0 4px 10px rgba(0,0,0,0.5));
-  }
-  @keyframes popHeart {
-    0% { transform: translate(-50%, -50%) scale(0); opacity: 0; }
-    15% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
-    30% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
-    70% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
-    100% { transform: translate(-50%, -50%) scale(1.5); opacity: 0; }
-  }
-
-  /* Comments */
-  .comments-section { margin-top: 12px; padding-top: 12px; border-top: 1px dashed rgba(255,255,255,0.06); }
-  .comments-loading, .comments-empty { font-size: 0.8rem; color: rgba(255,255,255,0.3); text-align: center; margin-bottom: 12px; }
-  .comments-list { display: flex; flex-direction: column; gap: 12px; margin-bottom: 12px; max-height: 300px; overflow-y: auto; }
-  .comment-item { display: flex; gap: 8px; }
-  .comment-avatar .c-avatar, .comment-avatar .c-avatar-img { width: 28px; height: 28px; font-size: 0.55rem; }
-  .comment-content { flex: 1; background: rgba(255,255,255,0.03); padding: 8px 12px; border-radius: 0 12px 12px 12px; }
-  .comment-name { display: block; font-size: 0.75rem; font-weight: 600; color: #d4a017; margin-bottom: 2px; }
-  .comment-text { font-size: 0.8rem; color: #fff; margin: 0; line-height: 1.4; word-break: break-word; }
-  .comment-input-wrap { display: flex; gap: 8px; align-items: center; }
-  .comment-input {
-    flex: 1; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 20px; padding: 8px 14px; color: #fff; font-size: 0.8rem; outline: none; transition: border-color 0.15s;
-    font-family: 'Poppins', sans-serif;
-  }
-  .comment-input:focus { border-color: rgba(212,160,23,0.4); }
-  .comment-send {
-    background: #d4a017; color: #000; border: none; width: 32px; height: 32px; border-radius: 50%;
-    display: flex; align-items: center; justify-content: center; cursor: pointer; transition: transform 0.1s;
-  }
-  .comment-send:disabled { opacity: 0.4; cursor: not-allowed; }
-  .comment-send:not(:disabled):hover { transform: scale(1.05); }
-
-  /* Poll options */
-  .poll-options-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }
-  .poll-opt {
-    position: relative; overflow: hidden;
-    width: 100%; text-align: left;
-    padding: 10px 12px;
-    background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 10px; cursor: pointer;
-    display: flex; justify-content: space-between; align-items: center;
-    gap: 8px; transition: border-color 0.15s;
-    min-height: 44px;
-  }
-  .poll-opt:not(.no-vote):hover { border-color: rgba(212,160,23,0.4); }
-  .poll-opt.mine { border-color: rgba(212,160,23,0.5); }
-  .poll-opt.no-vote { cursor: default; }
-  .poll-bar {
-    position: absolute; left: 0; top: 0; bottom: 0;
-    background: rgba(212,160,23,0.12);
-    border-radius: 10px; z-index: 0;
-    transition: width 0.4s ease;
-  }
-  .poll-opt-text { position: relative; z-index: 1; font-size: 0.85rem; color: #fff; font-family: 'Poppins', sans-serif; }
-  .poll-pct { position: relative; z-index: 1; font-size: 0.75rem; font-weight: 600; color: rgba(212,160,23,0.8); flex-shrink: 0; font-family: 'Poppins', sans-serif; }
-  .poll-footer { font-size: 0.75rem; color: rgba(255,255,255,0.35); margin: 4px 0 0; }
-  .poll-closed { color: rgba(239,68,68,0.6); }
-
-  /* Compose overlay */
-  .compose-overlay {
-    position: fixed; inset: 0; background: rgba(0,0,0,0.6);
-    z-index: 50; display: flex; align-items: flex-end;
-  }
-  .compose-sheet {
-    width: 100%;
-    background: #161210;
-    border-radius: 20px 20px 0 0;
-    border-top: 1px solid rgba(255,255,255,0.1);
-    max-height: 85svh;
-    overflow-y: auto;
-    padding-bottom: env(safe-area-inset-bottom, 16px);
-    animation: slideUp 0.28s cubic-bezier(0.32,0.72,0,1) forwards;
-  }
-  @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
-  .compose-handle { width: 36px; height: 4px; border-radius: 2px; background: rgba(255,255,255,0.15); margin: 10px auto 0; }
-  .compose-top {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 12px 16px 8px;
-    border-bottom: 1px solid rgba(255,255,255,0.06);
-  }
-  .compose-tabs { display: flex; gap: 4px; }
-  .compose-tab {
-    display: flex; align-items: center; gap: 5px;
-    background: transparent; border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 20px; padding: 6px 14px;
-    color: rgba(255,255,255,0.5); font-size: 0.8rem; font-weight: 500;
-    font-family: 'Poppins', sans-serif; cursor: pointer; transition: all 0.15s;
-  }
-  .compose-tab.on { background: rgba(212,160,23,0.12); border-color: rgba(212,160,23,0.4); color: #d4a017; }
-  .compose-close {
-    background: transparent; border: none; color: rgba(255,255,255,0.4);
-    cursor: pointer; padding: 6px; display: flex; align-items: center;
-  }
-  .compose-body { padding: 12px 16px 16px; display: flex; flex-direction: column; gap: 12px; }
-  .compose-textarea {
-    width: 100%; background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.08); border-radius: 12px;
-    padding: 12px; color: #fff; font-family: 'Poppins', sans-serif;
-    font-size: 0.92rem; resize: none; outline: none;
-    transition: border-color 0.15s; box-sizing: border-box; line-height: 1.5;
-  }
-  .compose-textarea:focus { border-color: rgba(212,160,23,0.4); }
-  .compose-textarea::placeholder { color: rgba(255,255,255,0.25); }
-  .compose-input {
-    width: 100%; background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.08); border-radius: 10px;
-    padding: 11px 12px; color: #fff; font-family: 'Poppins', sans-serif;
-    font-size: 0.88rem; outline: none; transition: border-color 0.15s;
-    box-sizing: border-box;
-  }
-  .compose-input:focus { border-color: rgba(212,160,23,0.4); }
-  .compose-input::placeholder { color: rgba(255,255,255,0.25); }
-  .compose-options-list { display: flex; flex-direction: column; gap: 8px; }
-  .compose-opt-row { display: flex; gap: 8px; align-items: center; }
-  .compose-opt-row .compose-input { flex: 1; }
-  .compose-rm-opt {
-    flex-shrink: 0; width: 32px; height: 32px; border-radius: 50%;
-    background: rgba(255,255,255,0.06); border: none;
-    color: rgba(255,255,255,0.5); cursor: pointer;
-    display: flex; align-items: center; justify-content: center;
-  }
-  .compose-add-opt {
-    background: transparent; border: 1px dashed rgba(255,255,255,0.15);
-    border-radius: 10px; padding: 10px; color: rgba(255,255,255,0.4);
-    font-family: 'Poppins', sans-serif; font-size: 0.82rem; cursor: pointer;
-    transition: border-color 0.15s, color 0.15s;
-  }
-  .compose-add-opt:hover { border-color: rgba(212,160,23,0.4); color: #d4a017; }
-  .compose-poll-settings { display: flex; gap: 16px; flex-wrap: wrap; }
-  .compose-toggle-label {
-    display: flex; align-items: center; gap: 6px;
-    font-size: 0.82rem; color: rgba(255,255,255,0.5);
-    cursor: pointer; font-family: 'Poppins', sans-serif;
-  }
-  .compose-toggle-label input[type=checkbox] { accent-color: #d4a017; width: 16px; height: 16px; cursor: pointer; }
-  .compose-error {
-    background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.2);
-    border-radius: 8px; padding: 8px 12px;
-    color: #fca5a5; font-size: 0.78rem; margin: 0;
-  }
-  .compose-img-preview { position: relative; display: inline-block; margin-top: 4px; border-radius: 12px; overflow: hidden; max-height: 150px; background: #000; border: 1px solid rgba(255,255,255,0.1); }
-  .compose-img-preview img { height: 100%; max-height: 150px; width: auto; display: block; object-fit: cover; }
-  .preview-rm { position: absolute; top: 6px; right: 6px; background: rgba(0,0,0,0.6); border: none; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; color: #fff; cursor: pointer; backdrop-filter: blur(4px); transition: background 0.15s; }
-  .preview-rm:hover { background: rgba(239,68,68,0.8); }
-  .compose-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 4px; }
-  .compose-left-actions { display: flex; align-items: center; gap: 12px; }
-  .compose-img-btn { background: transparent; border: none; color: #d4a017; padding: 6px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background 0.15s; margin-left: -6px; }
-  .compose-img-btn:hover { background: rgba(212,160,23,0.1); }
-  .compose-count { font-size: 0.75rem; color: rgba(255,255,255,0.25); }
-  .compose-submit {
-    background: linear-gradient(135deg, #d4a017, #b8860b);
-    border: none; border-radius: 20px;
-    padding: 10px 24px; color: #0c0a08;
-    font-family: 'Poppins', sans-serif; font-size: 0.85rem; font-weight: 600;
-    cursor: pointer; transition: opacity 0.15s, transform 0.1s;
-    min-width: 90px;
-  }
-  .compose-submit:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
-  .compose-submit:not(:disabled):hover { opacity: 0.9; transform: scale(1.02); }
-`;

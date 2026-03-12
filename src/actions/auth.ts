@@ -3,6 +3,11 @@
 import { createClient } from "@/lib/supabase-server";
 import { headers } from "next/headers";
 
+function errorMessage(error: unknown, fallback: string) {
+    if (error instanceof Error) return error.message;
+    return fallback;
+}
+
 export async function registerUser(formData: FormData) {
     const email = formData.get('email') as string;
     const password = formData.get('password') as string;
@@ -52,9 +57,9 @@ export async function registerUser(formData: FormData) {
         }
 
         return { success: true };
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('Registration Error:', error);
-        return { error: error.message || 'Error al registrar usuario.' };
+        return { error: errorMessage(error, 'Error al registrar usuario.') };
     }
 }
 
@@ -71,8 +76,8 @@ export async function loginUser(formData: FormData) {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) return { error: error.message };
         return { success: true };
-    } catch (error: any) {
-        return { error: error.message || 'Error al iniciar sesión.' };
+    } catch (error: unknown) {
+        return { error: errorMessage(error, 'Error al iniciar sesión.') };
     }
 }
 
@@ -99,8 +104,8 @@ export async function signInWithGoogle() {
 
         if (error) return { error: error.message };
         return { url: data.url };
-    } catch (error: any) {
-        return { error: error.message || 'Error al iniciar sesión con Google.' };
+    } catch (error: unknown) {
+        return { error: errorMessage(error, 'Error al iniciar sesión con Google.') };
     }
 }
 
@@ -109,7 +114,7 @@ export async function logoutUser() {
         const supabase = await createClient();
         await supabase.auth.signOut();
         return { success: true };
-    } catch (e: any) {
-        return { error: e?.message || 'Error al cerrar sesión' };
+    } catch (e: unknown) {
+        return { error: errorMessage(e, 'Error al cerrar sesión') };
     }
 }

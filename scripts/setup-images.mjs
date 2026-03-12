@@ -1,7 +1,17 @@
 import { createClient } from '@supabase/supabase-js';
 
-const serviceKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp0a25lcnRycWhzempkZ21kZ3p2Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MzI0MDQzMCwiZXhwIjoyMDg4ODE2NDMwfQ.FBJKuXX4iW6UNvBfNe6c7VWX8gUttZefcQcYfXtgmpE';
-const supabase = createClient('https://jtknertrqhszjdgmdgzv.supabase.co', serviceKey);
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!supabaseUrl) {
+    throw new Error('Missing Supabase URL. Set NEXT_PUBLIC_SUPABASE_URL or SUPABASE_URL before running this script.');
+}
+
+if (!serviceKey) {
+    throw new Error('Missing SUPABASE_SERVICE_ROLE_KEY before running this script.');
+}
+
+const supabase = createClient(supabaseUrl, serviceKey);
 
 // Upload a real PNG (1x1 pixel) to test
 const png1x1 = Buffer.from(

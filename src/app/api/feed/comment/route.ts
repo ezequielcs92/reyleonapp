@@ -33,7 +33,8 @@ export async function POST(request: NextRequest) {
 
         if (error) return NextResponse.json({ error: error.message }, { status: 500 });
         return NextResponse.json({ success: true, comment });
-    } catch (e: any) {
-        return NextResponse.json({ error: e?.message || 'Error al comentar' }, { status: 500 });
+    } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : 'Error al comentar';
+        return NextResponse.json({ error: msg }, { status: 500 });
     }
 }

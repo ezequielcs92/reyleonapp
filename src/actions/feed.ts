@@ -1,6 +1,11 @@
 'use server';
 import { createClient } from '@/lib/supabase-server';
 
+function errorMessage(error: unknown, fallback: string) {
+    if (error instanceof Error) return error.message;
+    return fallback;
+}
+
 export async function createPost(formData: FormData) {
     try {
         const supabase = await createClient();
@@ -24,8 +29,8 @@ export async function createPost(formData: FormData) {
 
         if (error) return { error: error.message };
         return { success: true };
-    } catch (e: any) {
-        return { error: e?.message || 'Error al publicar' };
+    } catch (e: unknown) {
+        return { error: errorMessage(e, 'Error al publicar') };
     }
 }
 
@@ -70,8 +75,8 @@ export async function createPoll(formData: FormData) {
             return { error: optErr.message, code: optErr.code };
         }
         return { success: true };
-    } catch (e: any) {
+    } catch (e: unknown) {
         console.error('[createPoll] Exception:', e);
-        return { error: e?.message || 'Error al crear encuesta', stack: e?.stack };
+        return { error: errorMessage(e, 'Error al crear encuesta') };
     }
 }

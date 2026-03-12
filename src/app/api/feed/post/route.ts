@@ -84,8 +84,9 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: error.message }, { status: 500 });
         }
         return NextResponse.json({ success: true, image_url: imageUrl });
-    } catch (e: any) {
+    } catch (e: unknown) {
         console.error('Create post exception:', e);
-        return NextResponse.json({ error: e?.message || 'Error al publicar' }, { status: 500 });
+        const msg = e instanceof Error ? e.message : 'Error al publicar';
+        return NextResponse.json({ error: msg }, { status: 500 });
     }
 }

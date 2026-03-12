@@ -5,21 +5,22 @@ import { User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import type { UserProfile } from '@/types';
 
-function mapProfile(data: any): UserProfile | null {
+function mapProfile(data: unknown): UserProfile | null {
     if (!data) return null;
+    const d = data as Record<string, unknown>;
     return {
-        uid: data.uid,
-        email: data.email,
-        fullName: data.full_name || data.fullName,
-        stageName: data.stage_name || data.stageName,
-        photoUrl: data.photo_url || data.photoUrl,
-        bio: data.bio,
-        roleInShow: data.role_in_show || data.roleInShow,
-        roles: data.roles || [],
-        skills: data.skills || [],
-        birthdate: data.birthdate,
-        createdAt: data.created_at || data.createdAt,
-        updatedAt: data.updated_at || data.updatedAt,
+        uid: d.uid as string,
+        email: d.email as string,
+        fullName: (d.full_name || d.fullName) as string,
+        stageName: (d.stage_name || d.stageName) as string | undefined,
+        photoUrl: (d.photo_url || d.photoUrl) as string | undefined,
+        bio: d.bio as string | undefined,
+        roleInShow: (d.role_in_show || d.roleInShow) as string | undefined,
+        roles: (d.roles || []) as string[],
+        skills: (d.skills || []) as string[],
+        birthdate: (d.birthdate || undefined) as string | undefined,
+        createdAt: (d.created_at || d.createdAt) as string,
+        updatedAt: (d.updated_at || d.updatedAt) as string,
     };
 }
 
@@ -47,33 +48,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [isAdmin, setIsAdmin] = useState(false);
     const [isSuperAdmin, setIsSuperAdmin] = useState(false);
     const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        // Get initial session
-        supabase.auth.getSession().then(({ data: { session } }) => {
-            setUser(session?.user ?? null);
-            if (session?.user) {
-                loadUserData(session.user.id);
-            } else {
-                setLoading(false);
-            }
-        });
-
-        // Listen for auth changes
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-            setUser(session?.user ?? null);
-            if (session?.user) {
-                loadUserData(session.user.id);
-            } else {
-                setProfile(null);
-                setIsAdmin(false);
-                setIsSuperAdmin(false);
-                setLoading(false);
-            }
-        });
-
-        return () => subscription.unsubscribe();
-    }, []);
 
     const loadUserData = async (userId: string) => {
         // Load user profile
@@ -141,10 +115,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             .channel(`admin:${userId}`)
             .on('postgres_changes',
                 { event: '*', schema: 'public', table: 'admins', filter: `uid=eq.${userId}` },
-                (payload) => {
+                (payload: { eventType: string; new: Record<string, unknown> }) => {
                     const isActive = payload.eventType !== 'DELETE';
                     setIsAdmin(isActive);
-                    setIsSuperAdmin(isActive && !!(payload.new as any)?.super_admin);
+                    setIsSuperAdmin(isActive && !!(payload.new?.super_admin));
                 }
             )
             .subscribe();
@@ -154,6 +128,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             adminChannel.unsubscribe();
         };
     };
+
+    useEffect(() => {
+        // Get initial session
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            setUser(session?.user ?? null);
+            if (session?.user) {
+                loadUserData(session.user.id);
+            } else {
+                setLoading(false);
+            }
+        });
+
+        // Listen for auth changes
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            setUser(session?.user ?? null);
+            if (session?.user) {
+                loadUserData(session.user.id);
+            } else {
+                setProfile(null);
+                setIsAdmin(false);
+                setIsSuperAdmin(false);
+                setLoading(false);
+            }
+        });
+
+        return () => subscription.unsubscribe();
+    }, []);
 
     return (
         <AuthContext.Provider value={{ user, profile, loading, isAdmin, isSuperAdmin }}>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
@@ -8,13 +8,10 @@ import {
     Calendar as CalendarIcon, 
     Clock, 
     ArrowLeft, 
-    MapPin, 
     Info, 
     Trash2,
-    Users,
     Music,
-    Star,
-    ChevronRight
+    Star
 } from 'lucide-react';
 import { deleteCalendarEvent } from '@/actions/calendar';
 
@@ -34,22 +31,21 @@ export default function EventDetailPage() {
     const [event, setEvent] = useState<CalendarEvent | null>(null);
     const [loading, setLoading] = useState(true);
 
-    const loadEvent = useCallback(async () => {
-        if (!id) return;
-        setLoading(true);
-        const { data, error } = await supabase
-            .from('calendar_events')
-            .select('*')
-            .eq('id', id)
-            .single();
-
-        if (data) setEvent(data);
-        setLoading(false);
-    }, [id]);
-
     useEffect(() => {
-        loadEvent();
-    }, [loadEvent]);
+        if (!id) return;
+        
+        (async () => {
+            setLoading(true);
+            const { data } = await supabase
+                .from('calendar_events')
+                .select('*')
+                .eq('id', id)
+                .single();
+
+            if (data) setEvent(data);
+            setLoading(false);
+        })();
+    }, [id]);
 
     const handleDelete = async () => {
         if (!event || !isAdmin) return;
@@ -103,9 +99,15 @@ export default function EventDetailPage() {
                 <button onClick={() => router.back()} className="back-btn">
                     <ArrowLeft size={24} />
                 </button>
-                <div className="header-type">
-                   {event.type === 'ensayo' ? 'Ensayo Musical' : 'Fecha Especial'}
-                </div>
+                     <div className="header-type">
+                         {event.type === 'ensayo'
+                                ? 'Ensayo Musical'
+                                : event.type === 'funcion'
+                                     ? 'Función'
+                                     : event.type === 'evento'
+                                          ? 'Evento General'
+                                          : 'Fecha Especial'}
+                     </div>
                 {isAdmin && (
                     <button onClick={handleDelete} className="del-btn">
                         <Trash2 size={20} />
@@ -115,7 +117,7 @@ export default function EventDetailPage() {
 
             <main className="ev-detail-content">
                 <div className={`ev-type-badge ${event.type}`}>
-                    {event.type === 'ensayo' ? <Music size={16} /> : <Star size={16} />}
+                    {event.type === 'ensayo' ? <Music size={16} /> : event.type === 'funcion' ? <CalendarIcon size={16} /> : <Star size={16} />}
                     {event.type.replace('_', ' ').toUpperCase()}
                 </div>
 
@@ -190,6 +192,7 @@ const detailStyles = `
         margin-bottom: 16px;
     }
     .ev-type-badge.ensayo { background: rgba(66, 133, 244, 0.15); color: #4285f4; }
+    .ev-type-badge.funcion { background: rgba(245, 158, 11, 0.15); color: #f59e0b; }
     .ev-type-badge.fecha_importante { background: rgba(234, 67, 53, 0.15); color: #ea4335; }
     .ev-type-badge.evento { background: rgba(52, 168, 83, 0.15); color: #34a853; }
 

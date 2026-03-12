@@ -2,6 +2,12 @@
 
 import { createClient } from '@/lib/supabase-server';
 import { revalidatePath } from 'next/cache';
+import { notifyAllUsers } from '@/lib/notifications';
+
+function errorMessage(error: unknown, fallback: string) {
+    if (error instanceof Error) return error.message;
+    return fallback;
+}
 
 export async function addCalendarEvent(formData: FormData) {
     try {
@@ -27,20 +33,32 @@ export async function addCalendarEvent(formData: FormData) {
             return { error: 'Por favor completá los campos obligatorios.' };
         }
 
-        const { error } = await supabase.from('calendar_events').insert({
+        const { data: createdEvent, error } = await supabase.from('calendar_events').insert({
             title,
             description: description || null,
             event_date,
             type,
             created_by: user.id
-        });
+        }).select('id').single();
 
         if (error) return { error: error.message };
+
+        try {
+            await notifyAllUsers({
+                type: 'event_created',
+                title: 'Nuevo evento en calendario',
+                message: `Se agrego "${title}" al calendario del elenco.`,
+                link: createdEvent?.id ? `/calendario/${createdEvent.id}` : '/calendario',
+                actorId: user.id,
+            });
+        } catch (notifyError) {
+            console.error('Error notificando nuevo evento:', notifyError);
+        }
         
         revalidatePath('/calendario');
         return { success: true };
-    } catch (e: any) {
-        return { error: e?.message || 'Error al agregar evento' };
+    } catch (e: unknown) {
+        return { error: errorMessage(e, 'Error al agregar evento') };
     }
 }
 
@@ -65,7 +83,7 @@ export async function deleteCalendarEvent(id: string) {
         
         revalidatePath('/calendario');
         return { success: true };
-    } catch (e: any) {
-        return { error: e?.message || 'Error al eliminar el evento' };
+    } catch (e: unknown) {
+        return { error: errorMessage(e, 'Error al eliminar el evento') };
     }
 }

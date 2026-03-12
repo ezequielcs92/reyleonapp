@@ -1,9 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import { useAuth } from '@/context/AuthContext';
 import Link from 'next/link';
 import { 
     Calendar as CalendarIcon, 
@@ -36,41 +35,40 @@ export default function DayViewPage() {
     const [birthdays, setBirthdays] = useState<UserProfile[]>([]);
     const [loading, setLoading] = useState(true);
 
-    const loadDayData = useCallback(async () => {
-        if (!date) return;
-        setLoading(true);
-        
-        // Load events for this specific day
-        const { data: evData } = await supabase
-            .from('calendar_events')
-            .select('*')
-            .gte('event_date', `${date}T00:00:00`)
-            .lte('event_date', `${date}T23:59:59`);
-
-        if (evData) setEvents(evData);
-
-        // Load birthdays
-        const [y, m, d] = (date as string).split('-');
-        const { data: bData } = await supabase
-            .from('users')
-            .select('uid, full_name, photo_url, birthdate')
-            .not('birthdate', 'is', null);
-
-        if (bData) {
-            const dayBirthdays = bData.filter(u => {
-                const bDate = new Date(u.birthdate);
-                // Compare UTC day and month to match the calendar logic
-                return bDate.getUTCDate() === parseInt(d) && bDate.getUTCMonth() === (parseInt(m) - 1);
-            });
-            setBirthdays(dayBirthdays as any);
-        }
-
-        setLoading(false);
-    }, [date]);
-
     useEffect(() => {
-        loadDayData();
-    }, [loadDayData]);
+        if (!date) return;
+
+        (async () => {
+            setLoading(true);
+            
+            // Load events for this specific day
+            const { data: evData } = await supabase
+                .from('calendar_events')
+                .select('*')
+                .gte('event_date', `${date}T00:00:00`)
+                .lte('event_date', `${date}T23:59:59`);
+
+            if (evData) setEvents(evData);
+
+            // Load birthdays
+            const [, m, d] = (date as string).split('-');
+            const { data: bData } = await supabase
+                .from('users')
+                .select('uid, full_name, photo_url, birthdate')
+                .not('birthdate', 'is', null);
+
+            if (bData) {
+                const dayBirthdays = bData.filter(u => {
+                    const bDate = new Date(u.birthdate);
+                    // Compare UTC day and month to match the calendar logic
+                    return bDate.getUTCDate() === parseInt(d) && bDate.getUTCMonth() === (parseInt(m) - 1);
+                });
+                setBirthdays(dayBirthdays as UserProfile[]);
+            }
+
+            setLoading(false);
+        })();
+    }, [date]);
 
     // Use split to avoid timezone off-by-one errors in display
     const getFormattedDate = () => {
@@ -142,7 +140,7 @@ export default function DayViewPage() {
                                                 <Link href={`/calendario/${e.id}`} key={e.id} className="result-card-link">
                                                     <div className={`result-card ${e.type}`}>
                                                         <div className="card-icon">
-                                                            {e.type === 'ensayo' ? <Music size={20} /> : <Star size={20} />}
+                                                            {e.type === 'ensayo' ? <Music size={20} /> : e.type === 'funcion' ? <CalendarIcon size={20} /> : <Star size={20} />}
                                                         </div>
                                                         <div className="card-info">
                                                             <span className="card-title">{e.title}</span>
@@ -204,6 +202,7 @@ const dayStyles = `
         display: flex; align-items: center; justify-content: center;
     }
     .ensayo .card-icon { background: rgba(66, 133, 244, 0.15); color: #4285f4; }
+    .funcion .card-icon { background: rgba(245, 158, 11, 0.15); color: #f59e0b; }
     .fecha_importante .card-icon { background: rgba(234, 67, 53, 0.15); color: #ea4335; }
     .bday .card-icon { background: rgba(255, 188, 5, 0.15); color: #FBBC05; }
     .evento .card-icon { background: rgba(52, 168, 83, 0.15); color: #34a853; }

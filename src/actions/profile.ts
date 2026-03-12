@@ -1,6 +1,11 @@
 'use server';
 import { createClient } from '@/lib/supabase-server';
 
+function errorMessage(error: unknown, fallback: string) {
+    if (error instanceof Error) return error.message;
+    return fallback;
+}
+
 export async function updateProfile(formData: FormData) {
     try {
         const supabase = await createClient();
@@ -20,8 +25,8 @@ export async function updateProfile(formData: FormData) {
 
         if (error) return { error: error.message };
         return { success: true };
-    } catch (e: any) {
-        return { error: e?.message || 'Error al actualizar perfil' };
+    } catch (e: unknown) {
+        return { error: errorMessage(e, 'Error al actualizar perfil') };
     }
 }
 
@@ -43,8 +48,8 @@ export async function addLink(formData: FormData) {
 
         if (error) return { error: error.message };
         return { success: true };
-    } catch (e: any) {
-        return { error: e?.message || 'Error al agregar link' };
+    } catch (e: unknown) {
+        return { error: errorMessage(e, 'Error al agregar link') };
     }
 }
 
@@ -59,8 +64,8 @@ export async function deleteLink(linkId: string) {
 
         if (error) return { error: error.message };
         return { success: true };
-    } catch (e: any) {
-        return { error: e?.message || 'Error al eliminar link' };
+    } catch (e: unknown) {
+        return { error: errorMessage(e, 'Error al eliminar link') };
     }
 }
 
@@ -84,8 +89,8 @@ export async function addWork(formData: FormData) {
 
         if (error) return { error: error.message };
         return { success: true };
-    } catch (e: any) {
-        return { error: e?.message || 'Error al agregar trabajo' };
+    } catch (e: unknown) {
+        return { error: errorMessage(e, 'Error al agregar trabajo') };
     }
 }
 
@@ -100,7 +105,7 @@ export async function deleteWork(workId: string) {
 
         if (error) return { error: error.message };
         return { success: true };
-    } catch (e: any) {
-        return { error: e?.message || 'Error al eliminar trabajo' };
+    } catch (e: unknown) {
+        return { error: errorMessage(e, 'Error al eliminar trabajo') };
     }
 }

@@ -24,7 +24,7 @@ html, body {
   padding: 0;
   background: var(--bg);
   color: var(--text);
-  font-family: 'Poppins', sans-serif;
+  font-family: var(--font-poppins), sans-serif;
   overscroll-behavior: none;
   -webkit-font-smoothing: antialiased;
 }

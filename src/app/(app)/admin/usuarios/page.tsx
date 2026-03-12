@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Search, Shield, ShieldAlert, User as UserIcon, MoreVertical, Trash2 } from 'lucide-react';
+import { Search, Shield, ShieldAlert, User as UserIcon } from 'lucide-react';
 
 type UserAdmin = {
     uid: string;
@@ -59,7 +59,7 @@ export default function AdminUsersPage() {
                 await supabase.from('admins').insert({ uid: userId });
             }
             loadUsers();
-        } catch (err) {
+        } catch {
             alert('Error al cambiar permisos');
         }
     }
@@ -115,7 +115,7 @@ export default function AdminUsersPage() {
                                             </div>
                                             <div>
                                                 <div className="user-name">{u.full_name}</div>
-                                                {u.stage_name && <div className="user-stage">"{u.stage_name}"</div>}
+                                                {u.stage_name && <div className="user-stage">&quot;{u.stage_name}&quot;</div>}
                                             </div>
                                         </div>
                                     </td>

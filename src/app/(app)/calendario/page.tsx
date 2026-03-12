@@ -1,62 +1,28 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { addCalendarEvent, deleteCalendarEvent } from '@/actions/calendar';
+import Sheet from '@/components/ui/sheet';
+import type { DbBirthdayEvent, DbCalendarEvent } from '@/types';
 import Link from 'next/link';
 import { 
     ChevronLeft, 
     ChevronRight, 
     Plus, 
     Calendar as CalendarIcon, 
-    Clock, 
-    Info, 
     Trash2, 
     Cake, 
     Music, 
     Star,
-    X,
     User as UserIcon
 } from 'lucide-react';
 
-type CalendarEvent = {
-    id: string;
-    title: string;
-    description: string | null;
-    event_date: string;
-    type: string;
-    created_at: string;
-};
-
-type BirthdayEvent = {
-    id: string;
-    full_name: string;
-    birthdate: string;
-    photo_url?: string | null;
-};
-
-// Reusable Sheet Component
-function Sheet({ open, onClose, title, children }: { open: boolean; onClose: () => void; title: string; children: React.ReactNode }) {
-    if (!open) return null;
-    return (
-        <div className="sheet-overlay" onClick={onClose} style={{ zIndex: 100 }}>
-            <div className="sheet-panel" onClick={e => e.stopPropagation()}>
-                <div className="sheet-handle" />
-                <div className="sheet-header">
-                    <span className="sheet-title">{title}</span>
-                    <button className="sheet-close" onClick={onClose}><X size={20} /></button>
-                </div>
-                <div className="sheet-body">{children}</div>
-            </div>
-        </div>
-    );
-}
-
 export default function CalendarPage() {
-    const { isAdmin, user } = useAuth();
-    const [events, setEvents] = useState<CalendarEvent[]>([]);
-    const [birthdays, setBirthdays] = useState<BirthdayEvent[]>([]);
+    const { isAdmin } = useAuth();
+    const [events, setEvents] = useState<DbCalendarEvent[]>([]);
+    const [birthdays, setBirthdays] = useState<DbBirthdayEvent[]>([]);
     const [currentDate, setCurrentDate] = useState(new Date());
     const [loading, setLoading] = useState(true);
     
@@ -71,8 +37,28 @@ export default function CalendarPage() {
         type: 'ensayo' 
     });
 
-    const loadData = useCallback(async () => {
-        setLoading(true);
+    useEffect(() => {
+        (async () => {
+            setLoading(true);
+            const [eventsRes, birthdaysRes] = await Promise.all([
+                supabase.from('calendar_events').select('*').order('event_date'),
+                supabase.from('users').select('uid, full_name, birthdate, photo_url').not('birthdate', 'is', null)
+            ]);
+
+            if (eventsRes.data) setEvents(eventsRes.data);
+            if (birthdaysRes.data) {
+                setBirthdays(birthdaysRes.data.map(b => ({
+                    id: b.uid,
+                    full_name: b.full_name,
+                    birthdate: b.birthdate,
+                    photo_url: b.photo_url
+                })));
+            }
+            setLoading(false);
+        })();
+    }, []);
+
+    const loadData = async () => {
         const [eventsRes, birthdaysRes] = await Promise.all([
             supabase.from('calendar_events').select('*').order('event_date'),
             supabase.from('users').select('uid, full_name, birthdate, photo_url').not('birthdate', 'is', null)
@@ -87,12 +73,7 @@ export default function CalendarPage() {
                 photo_url: b.photo_url
             })));
         }
-        setLoading(false);
-    }, []);
-
-    useEffect(() => {
-        loadData();
-    }, [loadData]);
+    };
 
     const handleCreate = async () => {
         if (!form.title || !form.event_date || !form.type) return;
@@ -203,7 +184,7 @@ export default function CalendarPage() {
                                         className={`cal-ev-item ${e.type}`} 
                                         title={e.title}
                                     >
-                                        {e.type === 'ensayo' ? <Music size={10} /> : <Star size={10} />}
+                                        {e.type === 'ensayo' ? <Music size={10} /> : e.type === 'funcion' ? <CalendarIcon size={10} /> : <Star size={10} />}
                                     </Link>
                                 ))}
                             </div>
@@ -214,6 +195,7 @@ export default function CalendarPage() {
 
             <div className="cal-legend">
                 <div className="leg-item"><div className="dot ensayo" /> Ensayo</div>
+                <div className="leg-item"><div className="dot funcion" /> Función</div>
                 <div className="leg-item"><div className="dot fecha_importante" /> Imp.</div>
                 <div className="leg-item"><div className="dot bday" /> Cumple</div>
             </div>
@@ -293,6 +275,7 @@ export default function CalendarPage() {
                 <label className="sheet-label">Tipo de Evento *</label>
                 <select className="sheet-select" value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))}>
                     <option value="ensayo">🎵 Ensayo</option>
+                    <option value="funcion">🎭 Función</option>
                     <option value="fecha_importante">⭐ Fecha Importante</option>
                     <option value="evento">📅 Evento General</option>
                 </select>
@@ -342,11 +325,13 @@ const calStyles = `
     .cal-ev-item.fecha_importante { background: #EA4335; color: #fff; }
     .cal-ev-item.bday { background: #FBBC05; color: #0c0a08; }
     .cal-ev-item.evento { background: #34A853; color: #fff; }
+    .cal-ev-item.funcion { background: #f59e0b; color: #0c0a08; }
     
     .cal-legend { display: flex; justify-content: center; gap: 16px; padding: 16px; }
     .leg-item { display: flex; align-items: center; gap: 6px; font-size: 0.75rem; color: rgba(255,255,255,0.5); }
     .dot { width: 8px; height: 8px; border-radius: 50%; }
     .dot.ensayo { background: #4285F4; }
+    .dot.funcion { background: #f59e0b; }
     .dot.fecha_importante { background: #EA4335; }
     .dot.bday { background: #FBBC05; }
     
@@ -379,6 +364,7 @@ const calStyles = `
     .cal-list-tag.ensayo { background: rgba(66, 133, 244, 0.15); color: #4285F4; }
     .cal-list-tag.fecha_importante { background: rgba(234, 67, 53, 0.15); color: #ea4335; }
     .cal-list-tag.evento { background: rgba(52, 168, 83, 0.15); color: #34a853; }
+    .cal-list-tag.funcion { background: rgba(245, 158, 11, 0.15); color: #f59e0b; }
     .cal-list-info { flex: 1; }
     .cal-list-title { display: block; font-size: 0.9rem; font-weight: 600; color: #fff; }
     .cal-list-desc { font-size: 0.75rem; color: rgba(255,255,255,0.4); margin: 2px 0 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

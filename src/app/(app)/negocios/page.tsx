@@ -1,9 +1,10 @@
 'use client';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { addBusiness, deleteBusiness } from '@/actions/businesses';
-import { Plus, X, Phone, Instagram, Globe, Trash2, Store } from 'lucide-react';
+import { Plus, Phone, Instagram, Globe, Trash2, Store } from 'lucide-react';
+import Sheet from '@/components/ui/sheet';
 
 type Category = { id: string; name: string; icon: string };
 type Business = {
@@ -13,28 +14,12 @@ type Business = {
     contact_phone: string | null;
     instagram_url: string | null;
     website_url: string | null;
-    owner_id: string;
+    owner_id?: string;
+    user_id?: string;
     category_id: string;
     created_at: string;
     owner_name?: string; // from joined users
 };
-
-// Sheet component reusable
-function Sheet({ open, onClose, title, children }: { open: boolean; onClose: () => void; title: string; children: React.ReactNode }) {
-    if (!open) return null;
-    return (
-        <div className="sheet-overlay" onClick={onClose} style={{ zIndex: 100 }}>
-            <div className="sheet-panel" onClick={e => e.stopPropagation()}>
-                <div className="sheet-handle" />
-                <div className="sheet-header">
-                    <span className="sheet-title">{title}</span>
-                    <button className="sheet-close" onClick={onClose}><X size={20} /></button>
-                </div>
-                <div className="sheet-body">{children}</div>
-            </div>
-        </div>
-    );
-}
 
 export default function NegociosPage() {
     const { user } = useAuth();
@@ -49,36 +34,67 @@ export default function NegociosPage() {
     const [createError, setCreateError] = useState('');
     const [form, setForm] = useState({ name: '', description: '', category_id: '', contact_phone: '', instagram_url: '', website_url: '' });
 
-    const loadData = useCallback(async () => {
-        if (!user) return;
-        setLoading(true);
-
+    const loadData = async () => {
         const [catsRes, busRes] = await Promise.all([
             supabase.from('business_categories').select('*').order('name'),
-            supabase.from('businesses').select('*, users(full_name)').order('created_at', { ascending: false })
+            supabase.from('businesses').select('*').order('created_at', { ascending: false })
         ]);
 
         if (catsRes.error) console.error('Cats Error:', catsRes.error);
         if (busRes.error) console.error('Bus Error:', busRes.error);
 
-        if (catsRes.data) setCategories(catsRes.data);
+        if (catsRes.data) {
+            setCategories(catsRes.data);
+            // Set default category only if not already set
+            setForm(f => f.category_id ? f : { ...f, category_id: catsRes.data[0]?.id || '' });
+        }
 
         if (busRes.data) {
-            const mapped = busRes.data.map((b: any) => ({
-                ...b,
-                owner_name: b.users?.full_name || 'Miembro del elenco'
-            }));
+            const ownerIds = Array.from(
+                new Set(
+                    busRes.data
+                        .map((b: Business) => b.owner_id || b.user_id)
+                        .filter(Boolean)
+                )
+            );
+
+            let usersById: Record<string, string> = {};
+            if (ownerIds.length > 0) {
+                const { data: usersData, error: usersError } = await supabase
+                    .from('users')
+                    .select('uid, full_name')
+                    .in('uid', ownerIds);
+
+                if (usersError) {
+                    console.error('Users Error:', usersError);
+                } else if (usersData) {
+                    usersById = Object.fromEntries(
+                        usersData.map((u: { uid: string; full_name: string }) => [u.uid, u.full_name])
+                    );
+                }
+            }
+
+            const mapped = busRes.data.map((b: Business) => {
+                const ownerId = b.owner_id || b.user_id || '';
+                return {
+                    ...b,
+                    owner_name: usersById[ownerId] || 'Miembro del elenco'
+                };
+            });
+
             setBusinesses(mapped);
         }
+    };
 
-        if (catsRes.data && catsRes.data.length > 0 && !form.category_id) {
-            setForm(f => ({ ...f, category_id: catsRes.data[0].id }));
-        }
+    useEffect(() => {
+        if (!user) return;
 
-        setLoading(false);
-    }, [user, form.category_id]);
-
-    useEffect(() => { loadData(); }, [loadData]);
+        (async () => {
+            setLoading(true);
+            await loadData();
+            setLoading(false);
+        })();
+    }, [user]);
 
     const handleCreate = async () => {
         if (!form.name.trim() || !form.description.trim() || !form.category_id) return;
@@ -152,7 +168,7 @@ export default function NegociosPage() {
                 ) : (
                     <div className="b-grid">
                         {filteredBusinesses.map(bus => {
-                            const isMine = bus.owner_id === user?.id;
+                            const isMine = (bus.owner_id || bus.user_id) === user?.id;
                             const cat = categories.find(c => c.id === bus.category_id);
                             
                             return (

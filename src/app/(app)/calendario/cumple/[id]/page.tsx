@@ -1,17 +1,14 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { 
-    Calendar as CalendarIcon, 
     ArrowLeft, 
     Cake, 
     MessageCircle,
     Instagram,
-    User,
-    ChevronRight,
-    MapPin
+    User
 } from 'lucide-react';
 
 type UserProfile = {
@@ -31,22 +28,21 @@ export default function BirthdayDetailPage() {
     const [profile, setProfile] = useState<UserProfile | null>(null);
     const [loading, setLoading] = useState(true);
 
-    const loadProfile = useCallback(async () => {
-        if (!id) return;
-        setLoading(true);
-        const { data, error } = await supabase
-            .from('users')
-            .select('*')
-            .eq('uid', id)
-            .single();
-
-        if (data) setProfile(data);
-        setLoading(false);
-    }, [id]);
-
     useEffect(() => {
-        loadProfile();
-    }, [loadProfile]);
+        if (!id) return;
+        
+        (async () => {
+            setLoading(true);
+            const { data } = await supabase
+                .from('users')
+                .select('*')
+                .eq('uid', id)
+                .single();
+
+            if (data) setProfile(data);
+            setLoading(false);
+        })();
+    }, [id]);
 
     if (loading) return (
         <div className="bday-detail-root loading">

@@ -4,6 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:reset": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/reset-next-dev.ps1",
+    "dev:clean": "npm run dev:reset && next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"

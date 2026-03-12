@@ -1,16 +1,21 @@
 'use client';
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import dynamic from 'next/dynamic';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { logoutUser } from '@/actions/auth';
 import { updateProfile, addLink, deleteLink, addWork, deleteWork } from '@/actions/profile';
 import { useRouter } from 'next/navigation';
-import { LogOut, Plus, Trash2, X, Globe, Instagram, Twitter, Youtube, Camera, Shield } from 'lucide-react';
-import Cropper, { Area, Point } from 'react-easy-crop';
+import { LogOut, Plus, Trash2, Globe, Instagram, Twitter, Youtube, Camera, Shield } from 'lucide-react';
+import { initials } from '@/lib/utils';
+import Sheet from '@/components/ui/sheet';
+import type { Area, Point } from 'react-easy-crop';
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const Cropper = dynamic(() => import('react-easy-crop'), { ssr: false }) as any;
 
 type Link = { id: string; type: string; label: string; url: string };
 type Work = { id: string; title: string; year: number; company: string; role: string; link?: string | null };
-type Prof = { full_name: string; stage_name?: string | null; bio?: string | null; role_in_show?: string | null; photo_url?: string | null; birthdate?: string | null; };
 
 const MAX_PHOTO_SIZE_MB = 5;
 
@@ -72,26 +77,6 @@ function LinkIcon({ type }: { type: string }) {
     return <Globe size={15} />;
 }
 
-function initials(name: string) {
-    return name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2);
-}
-
-function Sheet({ open, onClose, title, children }: { open: boolean; onClose: () => void; title: string; children: React.ReactNode }) {
-    if (!open) return null;
-    return (
-        <div className="sheet-overlay" onClick={onClose}>
-            <div className="sheet-panel" onClick={e => e.stopPropagation()}>
-                <div className="sheet-handle" />
-                <div className="sheet-header">
-                    <span className="sheet-title">{title}</span>
-                    <button className="sheet-close" onClick={onClose}><X size={20} /></button>
-                </div>
-                <div className="sheet-body">{children}</div>
-            </div>
-        </div>
-    );
-}
-
 export default function PerfilPage() {
     const { user, profile: prof, isAdmin, isSuperAdmin } = useAuth();
     const router = useRouter();
@@ -128,7 +113,21 @@ export default function PerfilPage() {
     const [workSubmitting, setWorkSubmitting] = useState(false);
     const [workError, setWorkError] = useState('');
 
-    const loadData = useCallback(async () => {
+    useEffect(() => {
+        if (!user) return;
+
+        (async () => {
+            const [lr, wr] = await Promise.all([
+                supabase.from('user_links').select('*').eq('user_id', user.id).order('created_at'),
+                supabase.from('user_work').select('*').eq('user_id', user.id).order('year', { ascending: false }),
+            ]);
+            setLinks(lr.data || []);
+            setWorks(wr.data || []);
+            setLoading(false);
+        })();
+    }, [user]);
+
+    const loadData = async () => {
         if (!user) return;
         const [lr, wr] = await Promise.all([
             supabase.from('user_links').select('*').eq('user_id', user.id).order('created_at'),
@@ -136,10 +135,7 @@ export default function PerfilPage() {
         ]);
         setLinks(lr.data || []);
         setWorks(wr.data || []);
-        setLoading(false);
-    }, [user]);
-
-    useEffect(() => { loadData(); }, [loadData]);
+    };
 
     function openEdit() {
         setEditForm({
@@ -459,7 +455,7 @@ export default function PerfilPage() {
                                 showGrid={false}
                                 onCropChange={setCrop}
                                 onZoomChange={setZoom}
-                                onCropComplete={(_, areaPixels) => setCroppedAreaPixels(areaPixels)}
+                                onCropComplete={(_: Area, areaPixels: Area) => setCroppedAreaPixels(areaPixels)}
                             />
                         )}
                     </div>

@@ -49,7 +49,8 @@ export async function POST(request: NextRequest) {
         }
 
         return NextResponse.json({ success: true });
-    } catch (e: any) {
-        return NextResponse.json({ error: e?.message || 'Error al crear encuesta' }, { status: 500 });
+    } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : 'Error al crear encuesta';
+        return NextResponse.json({ error: msg }, { status: 500 });
     }
 }

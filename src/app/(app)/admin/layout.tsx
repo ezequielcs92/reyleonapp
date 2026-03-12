@@ -3,10 +3,12 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { Users, Calendar, Store, LayoutDashboard, ChevronLeft, Menu, X, Shield, Bell, Settings, LogOut } from 'lucide-react';
+import { Users, Calendar, Store, LayoutDashboard, ChevronLeft, Menu, X, Shield, Bell, Settings, MessageSquareText, Info } from 'lucide-react';
 
 const ADMIN_LINKS = [
     { href: '/admin', label: 'Dashboard', Icon: LayoutDashboard },
+    { href: '/admin/feed', label: 'Feed', Icon: MessageSquareText },
+    { href: '/admin/info', label: 'Info', Icon: Info },
     { href: '/admin/usuarios', label: 'Elenco', Icon: Users },
     { href: '/admin/calendario', label: 'Eventos', Icon: Calendar },
     { href: '/admin/negocios', label: 'Emprendimientos', Icon: Store },
