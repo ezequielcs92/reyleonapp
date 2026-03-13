@@ -35,6 +35,17 @@ export default function DayViewPage() {
     const [birthdays, setBirthdays] = useState<UserProfile[]>([]);
     const [loading, setLoading] = useState(true);
 
+    const getBirthMonthDay = (birthdate: string) => {
+        const [y = '', m = '', d = ''] = birthdate.split('T')[0]?.split('-') ?? [];
+        if (!y || !m || !d) return null;
+
+        const monthValue = Number(m);
+        const dayValue = Number(d);
+        if (Number.isNaN(monthValue) || Number.isNaN(dayValue)) return null;
+
+        return { month: monthValue, day: dayValue };
+    };
+
     useEffect(() => {
         if (!date) return;
 
@@ -59,9 +70,10 @@ export default function DayViewPage() {
 
             if (bData) {
                 const dayBirthdays = bData.filter(u => {
-                    const bDate = new Date(u.birthdate);
-                    // Compare UTC day and month to match the calendar logic
-                    return bDate.getUTCDate() === parseInt(d) && bDate.getUTCMonth() === (parseInt(m) - 1);
+                    const parts = getBirthMonthDay(u.birthdate);
+                    if (!parts) return false;
+
+                    return parts.day === parseInt(d) && parts.month === parseInt(m);
                 });
                 setBirthdays(dayBirthdays as UserProfile[]);
             }

@@ -16,6 +16,7 @@ type PostItem = {
     author_photo_url: string | null; description: string;
     image_url: string | null;
     likes_count: number; pinned: boolean; created_at: string;
+    comments_count: number;
     hidden_by_admin?: boolean;
     isLiked: boolean;
 };
@@ -53,9 +54,14 @@ const PostCard = memo(function PostCard({ item, onLike, canPin, onTogglePin, can
     const [showHeartAnim, setShowHeartAnim] = useState(false);
     const [showComments, setShowComments] = useState(false);
     const [comments, setComments] = useState<DbPostComment[]>([]);
+    const [commentCount, setCommentCount] = useState(item.comments_count || 0);
     const [loadingComments, setLoadingComments] = useState(false);
     const [newComment, setNewComment] = useState('');
     const [postingComment, setPostingComment] = useState(false);
+
+    useEffect(() => {
+        setCommentCount(item.comments_count || 0);
+    }, [item.comments_count]);
 
     const handleDoubleTap = () => {
         if (!item.isLiked) {
@@ -77,6 +83,7 @@ const PostCard = memo(function PostCard({ item, onLike, canPin, onTogglePin, can
                     .order('created_at', { ascending: true });
                 if (!error && data) {
                     setComments(data);
+                    setCommentCount(data.length);
                 }
             } catch (e) {
                 console.error(e);
@@ -100,6 +107,7 @@ const PostCard = memo(function PostCard({ item, onLike, canPin, onTogglePin, can
             const data = await res.json();
             if (data.success && data.comment) {
                 setComments(prev => [...prev, data.comment]);
+                setCommentCount(prev => prev + 1);
                 setNewComment('');
             } else {
                 alert(data.error || 'Error al comentar. Verifica que la tabla post_comments existe.');
@@ -151,6 +159,7 @@ const PostCard = memo(function PostCard({ item, onLike, canPin, onTogglePin, can
                     </button>
                     <button className="card-action-btn" onClick={toggleComments}>
                         <MessageSquare size={16} />
+                        {commentCount > 0 && <span>{commentCount}</span>}
                     </button>
                     {canModerate && (
                         <>
@@ -344,8 +353,26 @@ export default function FeedPage() {
             votedMap[v.poll_id].push(v.option_id);
         });
 
+        const postIds = (postsRes.data || []).map(p => p.id);
+        const commentCountMap = new Map<string, number>();
+
+        if (postIds.length > 0) {
+            const { data: commentRows } = await supabase
+                .from('post_comments')
+                .select('post_id')
+                .in('post_id', postIds);
+
+            for (const row of commentRows || []) {
+                const current = commentCountMap.get(row.post_id) ?? 0;
+                commentCountMap.set(row.post_id, current + 1);
+            }
+        }
+
         const posts: PostItem[] = (postsRes.data || []).map(p => ({
-            ...p, itemType: 'post', isLiked: likedIds.has(p.id),
+            ...p,
+            itemType: 'post',
+            isLiked: likedIds.has(p.id),
+            comments_count: commentCountMap.get(p.id) ?? 0,
         }));
         const polls: PollItem[] = (pollsRes.data || []).map(p => ({
             ...p, itemType: 'poll',
@@ -520,6 +547,11 @@ export default function FeedPage() {
             .on(
                 'postgres_changes',
                 { event: '*', schema: 'public', table: 'poll_votes' },
+                () => scheduleFeedReload()
+            )
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'post_comments' },
                 () => scheduleFeedReload()
             )
             .subscribe((status) => {

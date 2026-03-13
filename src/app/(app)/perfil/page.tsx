@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabase';
 import { logoutUser } from '@/actions/auth';
 import { updateProfile, addLink, deleteLink, addWork, deleteWork } from '@/actions/profile';
 import { useRouter } from 'next/navigation';
-import { LogOut, Plus, Trash2, Globe, Instagram, Twitter, Youtube, Camera, Shield } from 'lucide-react';
+import { LogOut, Plus, Trash2, Globe, Instagram, Twitter, Youtube, Camera, Shield, Bell, BellOff } from 'lucide-react';
 import { initials } from '@/lib/utils';
 import Sheet from '@/components/ui/sheet';
 import type { Area, Point } from 'react-easy-crop';
@@ -77,6 +77,19 @@ function LinkIcon({ type }: { type: string }) {
     return <Globe size={15} />;
 }
 
+function urlBase64ToUint8Array(base64String: string): Uint8Array {
+    const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const rawData = window.atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+
+    for (let i = 0; i < rawData.length; i += 1) {
+        outputArray[i] = rawData.charCodeAt(i);
+    }
+
+    return outputArray;
+}
+
 export default function PerfilPage() {
     const { user, profile: prof, isAdmin, isSuperAdmin } = useAuth();
     const router = useRouter();
@@ -112,6 +125,10 @@ export default function PerfilPage() {
     const [workForm, setWorkForm] = useState({ title: '', year: String(new Date().getFullYear()), company: '', role: '', link: '' });
     const [workSubmitting, setWorkSubmitting] = useState(false);
     const [workError, setWorkError] = useState('');
+    const [pushEnabled, setPushEnabled] = useState(false);
+    const [pushSupported, setPushSupported] = useState(false);
+    const [pushLoading, setPushLoading] = useState(false);
+    const [pushMessage, setPushMessage] = useState('');
 
     useEffect(() => {
         if (!user) return;
@@ -126,6 +143,94 @@ export default function PerfilPage() {
             setLoading(false);
         })();
     }, [user]);
+
+    useEffect(() => {
+        const loadPushStatus = async () => {
+            if (!user) return;
+
+            const supported = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+            setPushSupported(supported);
+            if (!supported) return;
+
+            try {
+                const registration = await navigator.serviceWorker.register('/sw.js');
+                const subscription = await registration.pushManager.getSubscription();
+                const blockedByUser = window.localStorage.getItem('push-disabled') === '1';
+                setPushEnabled(!!subscription && !blockedByUser && Notification.permission === 'granted');
+            } catch {
+                setPushEnabled(false);
+            }
+        };
+
+        loadPushStatus();
+    }, [user]);
+
+    async function handlePushToggle() {
+        if (!user || !pushSupported || pushLoading) return;
+
+        const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+        if (!publicKey) {
+            setPushMessage('Falta configurar NEXT_PUBLIC_VAPID_PUBLIC_KEY');
+            return;
+        }
+
+        setPushLoading(true);
+        setPushMessage('');
+
+        try {
+            const registration = await navigator.serviceWorker.register('/sw.js');
+            const existingSubscription = await registration.pushManager.getSubscription();
+
+            if (pushEnabled) {
+                if (existingSubscription) {
+                    const endpoint = existingSubscription.endpoint;
+                    await existingSubscription.unsubscribe();
+                    await fetch('/api/push/unsubscribe', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ endpoint }),
+                    });
+                } else {
+                    await fetch('/api/push/unsubscribe', { method: 'POST' });
+                }
+
+                window.localStorage.setItem('push-disabled', '1');
+                setPushEnabled(false);
+                setPushMessage('Notificaciones push desactivadas.');
+                return;
+            }
+
+            let permission = Notification.permission;
+            if (permission !== 'granted') {
+                permission = await Notification.requestPermission();
+                window.localStorage.setItem('push-permission-asked', '1');
+            }
+
+            if (permission !== 'granted') {
+                setPushMessage('Debés permitir notificaciones en el navegador.');
+                return;
+            }
+
+            const subscription = existingSubscription || await registration.pushManager.subscribe({
+                userVisibleOnly: true,
+                applicationServerKey: urlBase64ToUint8Array(publicKey) as unknown as BufferSource,
+            });
+
+            await fetch('/api/push/subscribe', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ subscription: subscription.toJSON() }),
+            });
+
+            window.localStorage.removeItem('push-disabled');
+            setPushEnabled(true);
+            setPushMessage('Notificaciones push activadas.');
+        } catch {
+            setPushMessage('No se pudo actualizar el estado de notificaciones push.');
+        } finally {
+            setPushLoading(false);
+        }
+    }
 
     const loadData = async () => {
         if (!user) return;
@@ -340,6 +445,27 @@ export default function PerfilPage() {
                         <p className="pf-bio">{prof.bio}</p>
                     </div>
                 )}
+
+                <div className="pf-section">
+                    <div className="pf-section-header">
+                        <span className="pf-section-title">Notificaciones push</span>
+                    </div>
+                    {!pushSupported ? (
+                        <p className="pf-empty-text">Este dispositivo o navegador no soporta notificaciones push.</p>
+                    ) : (
+                        <div className="pf-push-row">
+                            <div className="pf-push-info">
+                                <span className="pf-push-label">Eventos de calendario</span>
+                                <span className="pf-push-sub">{pushEnabled ? 'Activadas en este dispositivo' : 'Desactivadas en este dispositivo'}</span>
+                            </div>
+                            <button className={`pf-push-toggle ${pushEnabled ? 'on' : ''}`} onClick={handlePushToggle} disabled={pushLoading}>
+                                {pushEnabled ? <Bell size={15} /> : <BellOff size={15} />}
+                                {pushLoading ? 'Guardando...' : (pushEnabled ? 'Activadas' : 'Activar')}
+                            </button>
+                        </div>
+                    )}
+                    {pushMessage && <p className="pf-push-msg">{pushMessage}</p>}
+                </div>
 
                 {/* Social Links */}
                 <div className="pf-section">
@@ -619,6 +745,26 @@ export default function PerfilPage() {
   }
   .pf-add-btn:hover { background: rgba(212,160,23,0.2); }
   .pf-empty-text { font-size: 0.82rem; color: rgba(255,255,255,0.25); margin: 0; }
+    .pf-push-row {
+        display: flex; align-items: center; justify-content: space-between; gap: 12px;
+        background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);
+        border-radius: 12px; padding: 12px;
+    }
+    .pf-push-info { display: flex; flex-direction: column; gap: 2px; }
+    .pf-push-label { font-size: 0.84rem; color: #fff; font-weight: 500; }
+    .pf-push-sub { font-size: 0.74rem; color: rgba(255,255,255,0.42); }
+    .pf-push-toggle {
+        display: inline-flex; align-items: center; gap: 6px;
+        border: 1px solid rgba(255,255,255,0.16); background: rgba(255,255,255,0.03);
+        color: rgba(255,255,255,0.78); border-radius: 999px; padding: 7px 12px;
+        font-size: 0.72rem; font-weight: 600; font-family: 'Poppins', sans-serif;
+        cursor: pointer;
+    }
+    .pf-push-toggle.on {
+        border-color: rgba(212,160,23,0.45); background: rgba(212,160,23,0.12); color: #d4a017;
+    }
+    .pf-push-toggle:disabled { opacity: 0.6; cursor: not-allowed; }
+    .pf-push-msg { margin: 10px 0 0; font-size: 0.76rem; color: rgba(212,160,23,0.9); }
   .pf-skeleton {
     height: 56px; border-radius: 10px;
     background: linear-gradient(90deg, rgba(255,255,255,0.03) 25%, rgba(255,255,255,0.06) 50%, rgba(255,255,255,0.03) 75%);

@@ -3,6 +3,7 @@ import { Poppins } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
 import ErrorBoundary from "@/components/ErrorBoundary";
+import PushNotificationsInit from "@/components/PushNotificationsInit";
 
 const poppins = Poppins({
   subsets: ["latin"],
@@ -43,6 +44,7 @@ export default function RootLayout({
       </head>
       <body>
         <AuthProvider>
+          <PushNotificationsInit />
           <ErrorBoundary>{children}</ErrorBoundary>
         </AuthProvider>
       </body>

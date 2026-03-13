@@ -124,13 +124,24 @@ export default function CalendarPage() {
 
     const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 
+    const getBirthMonthDay = (birthdate: string) => {
+        const [y = '', m = '', d = ''] = birthdate.split('T')[0]?.split('-') ?? [];
+        if (!y || !m || !d) return null;
+
+        const monthValue = Number(m);
+        const dayValue = Number(d);
+        if (Number.isNaN(monthValue) || Number.isNaN(dayValue)) return null;
+
+        return { month: monthValue - 1, day: dayValue };
+    };
+
     const getEventsForDay = (day: number) => {
         const d = new Date(year, month, day);
         const dayStr = d.toISOString().split('T')[0];
         const dayEvents = events.filter(e => e.event_date.split('T')[0] === dayStr);
         const dayBirthdays = birthdays.filter(b => {
-            const bDate = new Date(b.birthdate);
-            return bDate.getUTCDate() === day && bDate.getUTCMonth() === month;
+            const parts = getBirthMonthDay(b.birthdate);
+            return parts !== null && parts.day === day && parts.month === month;
         });
         return { dayEvents, dayBirthdays };
     };
@@ -206,9 +217,19 @@ export default function CalendarPage() {
                   <span className="section-subtitle">{monthNames[month]}</span>
                 </div>
                 <div className="bday-strip">
-                    {birthdays.filter(b => new Date(b.birthdate).getUTCMonth() === month).length > 0 ? (
-                        birthdays.filter(b => new Date(b.birthdate).getUTCMonth() === month)
-                        .sort((a,b) => new Date(a.birthdate).getUTCDate() - new Date(b.birthdate).getUTCDate())
+                    {birthdays.filter(b => {
+                        const parts = getBirthMonthDay(b.birthdate);
+                        return parts !== null && parts.month === month;
+                    }).length > 0 ? (
+                        birthdays.filter(b => {
+                            const parts = getBirthMonthDay(b.birthdate);
+                            return parts !== null && parts.month === month;
+                        })
+                        .sort((a,b) => {
+                            const aParts = getBirthMonthDay(a.birthdate);
+                            const bParts = getBirthMonthDay(b.birthdate);
+                            return (aParts?.day ?? 0) - (bParts?.day ?? 0);
+                        })
                         .map(b => (
                             <Link href={`/calendario/cumple/${b.id}`} key={b.id} className="bday-card-link">
                                 <div className="bday-card">
@@ -221,7 +242,7 @@ export default function CalendarPage() {
                                         <div className="bday-mini-badge">🎂</div>
                                     </div>
                                     <span className="bday-name">{b.full_name.split(' ')[0]}</span>
-                                    <span className="bday-date">{new Date(b.birthdate).getUTCDate()} {monthNames[month].substring(0,3)}</span>
+                                    <span className="bday-date">{getBirthMonthDay(b.birthdate)?.day ?? '--'} {monthNames[month].substring(0,3)}</span>
                                 </div>
                             </Link>
                         ))

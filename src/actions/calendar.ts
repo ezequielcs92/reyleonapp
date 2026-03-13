@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase-server';
 import { revalidatePath } from 'next/cache';
 import { notifyAllUsers } from '@/lib/notifications';
+import { sendCalendarEventPush } from '@/lib/push';
 
 function errorMessage(error: unknown, fallback: string) {
     if (error instanceof Error) return error.message;
@@ -53,6 +54,12 @@ export async function addCalendarEvent(formData: FormData) {
             });
         } catch (notifyError) {
             console.error('Error notificando nuevo evento:', notifyError);
+        }
+
+        try {
+            await sendCalendarEventPush(title, createdEvent?.id || null, user.id);
+        } catch (pushError) {
+            console.error('Error enviando push de evento:', pushError);
         }
         
         revalidatePath('/calendario');
