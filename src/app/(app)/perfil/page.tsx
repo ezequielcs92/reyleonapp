@@ -9,6 +9,7 @@ import { useRouter } from 'next/navigation';
 import { LogOut, Plus, Trash2, Globe, Instagram, Twitter, Youtube, Camera, Shield, Bell, BellOff, Pencil } from 'lucide-react';
 import { initials } from '@/lib/utils';
 import Sheet from '@/components/ui/sheet';
+import { InstallPWA } from '@/components/InstallPWA';
 import type { Area, Point } from 'react-easy-crop';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -489,6 +490,17 @@ export default function PerfilPage() {
                         </div>
                     )}
                     {pushMessage && <p className="pf-push-msg">{pushMessage}</p>}
+                </div>
+
+                {/* PWA Install */}
+                <div className="pf-section">
+                    <div className="pf-section-header">
+                        <span className="pf-section-title">Aplicación</span>
+                    </div>
+                    <div className="pf-card p-4 bg-amber-600/5 border border-amber-600/10 rounded-xl space-y-3">
+                        <p className="text-sm text-zinc-400">Instala la app en tu pantalla de inicio para un acceso rápido y recibir notificaciones.</p>
+                        <InstallPWA />
+                    </div>
                 </div>
 
                 {/* Social Links */}

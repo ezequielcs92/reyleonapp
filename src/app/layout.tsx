@@ -17,7 +17,7 @@ export const metadata: Metadata = {
   description: "App oficial del elenco de El Rey León",
   icons: {
     icon: "/icon-192.png",
-    apple: "/apple-icon.png",
+    apple: "/icon-192.png",
   },
   appleWebApp: {
     capable: true,
