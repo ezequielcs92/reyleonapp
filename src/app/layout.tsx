@@ -15,6 +15,10 @@ const poppins = Poppins({
 export const metadata: Metadata = {
   title: "Rey León",
   description: "App oficial del elenco de El Rey León",
+  icons: {
+    icon: "/icon-192.png",
+    apple: "/apple-icon.png",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
