@@ -4,7 +4,8 @@ import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { initials, timeAgo } from '@/lib/utils';
 import type { DbNotificationItem, DbPostComment } from '@/types';
-import { Heart, Plus, X, BarChart2, RefreshCw, Image as ImageIcon, MessageSquare, Send, Pin, PinOff, Bell, EyeOff, Eye, Trash2 } from 'lucide-react';
+import Link from 'next/link';
+import { Heart, Plus, X, BarChart2, RefreshCw, Image as ImageIcon, MessageSquare, Send, Pin, PinOff, Bell, EyeOff, Eye, Trash2, Search } from 'lucide-react';
 import './feed.css';
 
 // ── Types ──────────────────────────────────────────────────────
@@ -757,6 +758,9 @@ export default function FeedPage() {
                 <span className="fp-crown">♛</span>
                 <span className="fp-title">Rey León</span>
                 <div className="fp-header-actions">
+                    <Link href="/buscar" className="fp-search" aria-label="Buscar perfiles">
+                        <Search size={18} />
+                    </Link>
                     <button className="fp-bell" onClick={() => setNotifOpen(v => !v)}>
                         <Bell size={18} />
                         {notifUnread > 0 && <span className="fp-bell-badge">{notifUnread > 99 ? '99+' : notifUnread}</span>}

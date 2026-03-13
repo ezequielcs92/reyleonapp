@@ -13,6 +13,19 @@
 .fp-crown { font-size: 1.1rem; color: #d4a017; text-shadow: 0 0 10px rgba(212,160,23,0.4); }
 .fp-title { font-size: 1rem; font-weight: 600; color: #fff; flex: 1; letter-spacing: 0.01em; }
 .fp-header-actions { display: flex; align-items: center; gap: 8px; }
+.fp-search {
+  background: transparent;
+  border: none;
+  color: rgba(255,255,255,0.55);
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+.fp-search:hover { color: #fff; }
 .fp-bell {
   position: relative;
   background: transparent; border: none; color: rgba(255,255,255,0.55);
