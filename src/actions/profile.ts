@@ -6,11 +6,46 @@ function errorMessage(error: unknown, fallback: string) {
     return fallback;
 }
 
+async function ensureUserRow(
+    supabase: Awaited<ReturnType<typeof createClient>>,
+    user: { id: string; email?: string | null; user_metadata?: Record<string, unknown> }
+) {
+    const fullNameMeta = user.user_metadata?.full_name;
+    const nameMeta = user.user_metadata?.name;
+    const avatarMeta = user.user_metadata?.avatar_url;
+    const pictureMeta = user.user_metadata?.picture;
+
+    const full_name =
+        (typeof fullNameMeta === 'string' && fullNameMeta.trim()) ||
+        (typeof nameMeta === 'string' && nameMeta.trim()) ||
+        '';
+
+    const photo_url =
+        (typeof avatarMeta === 'string' && avatarMeta) ||
+        (typeof pictureMeta === 'string' && pictureMeta) ||
+        null;
+
+    const { error } = await supabase.from('users').upsert(
+        {
+            uid: user.id,
+            email: user.email ?? '',
+            full_name,
+            photo_url,
+        },
+        { onConflict: 'uid' }
+    );
+
+    return error;
+}
+
 export async function updateProfile(formData: FormData) {
     try {
         const supabase = await createClient();
         const { data: { user }, error: authErr } = await supabase.auth.getUser();
         if (authErr || !user) return { error: 'No autenticado' };
+
+        const ensureErr = await ensureUserRow(supabase, user);
+        if (ensureErr) return { error: ensureErr.message };
 
         const full_name = (formData.get('full_name') as string)?.trim();
         if (!full_name) return { error: 'El nombre es obligatorio' };
@@ -37,6 +72,9 @@ export async function addLink(formData: FormData) {
         const supabase = await createClient();
         const { data: { user }, error: authErr } = await supabase.auth.getUser();
         if (authErr || !user) return { error: 'No autenticado' };
+
+        const ensureErr = await ensureUserRow(supabase, user);
+        if (ensureErr) return { error: ensureErr.message };
 
         const type = (formData.get('type') as string)?.trim();
         const label = (formData.get('label') as string)?.trim();
@@ -71,11 +109,38 @@ export async function deleteLink(linkId: string) {
     }
 }
 
+export async function updateLink(linkId: string, formData: FormData) {
+    try {
+        const supabase = await createClient();
+        const { data: { user }, error: authErr } = await supabase.auth.getUser();
+        if (authErr || !user) return { error: 'No autenticado' };
+
+        const type = (formData.get('type') as string)?.trim();
+        const label = (formData.get('label') as string)?.trim();
+        const url = (formData.get('url') as string)?.trim();
+
+        if (!type || !label || !url) return { error: 'Todos los campos son obligatorios' };
+
+        const { error } = await supabase.from('user_links')
+            .update({ type, label, url })
+            .eq('id', linkId)
+            .eq('user_id', user.id);
+
+        if (error) return { error: error.message };
+        return { success: true };
+    } catch (e: unknown) {
+        return { error: errorMessage(e, 'Error al actualizar link') };
+    }
+}
+
 export async function addWork(formData: FormData) {
     try {
         const supabase = await createClient();
         const { data: { user }, error: authErr } = await supabase.auth.getUser();
         if (authErr || !user) return { error: 'No autenticado' };
+
+        const ensureErr = await ensureUserRow(supabase, user);
+        if (ensureErr) return { error: ensureErr.message };
 
         const title = (formData.get('title') as string)?.trim();
         const year = parseInt(formData.get('year') as string, 10);
@@ -109,5 +174,31 @@ export async function deleteWork(workId: string) {
         return { success: true };
     } catch (e: unknown) {
         return { error: errorMessage(e, 'Error al eliminar trabajo') };
+    }
+}
+
+export async function updateWork(workId: string, formData: FormData) {
+    try {
+        const supabase = await createClient();
+        const { data: { user }, error: authErr } = await supabase.auth.getUser();
+        if (authErr || !user) return { error: 'No autenticado' };
+
+        const title = (formData.get('title') as string)?.trim();
+        const year = parseInt(formData.get('year') as string, 10);
+        const company = (formData.get('company') as string)?.trim();
+        const role = (formData.get('role') as string)?.trim();
+        const link = (formData.get('link') as string)?.trim() || null;
+
+        if (!title || !year || !company || !role) return { error: 'Completá los campos obligatorios' };
+
+        const { error } = await supabase.from('user_work')
+            .update({ title, year, company, role, link })
+            .eq('id', workId)
+            .eq('user_id', user.id);
+
+        if (error) return { error: error.message };
+        return { success: true };
+    } catch (e: unknown) {
+        return { error: errorMessage(e, 'Error al actualizar trabajo') };
     }
 }

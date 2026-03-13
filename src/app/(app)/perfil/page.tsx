@@ -4,9 +4,9 @@ import dynamic from 'next/dynamic';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { logoutUser } from '@/actions/auth';
-import { updateProfile, addLink, deleteLink, addWork, deleteWork } from '@/actions/profile';
+import { updateProfile, addLink, deleteLink, addWork, deleteWork, updateLink, updateWork } from '@/actions/profile';
 import { useRouter } from 'next/navigation';
-import { LogOut, Plus, Trash2, Globe, Instagram, Twitter, Youtube, Camera, Shield, Bell, BellOff } from 'lucide-react';
+import { LogOut, Plus, Trash2, Globe, Instagram, Twitter, Youtube, Camera, Shield, Bell, BellOff, Pencil } from 'lucide-react';
 import { initials } from '@/lib/utils';
 import Sheet from '@/components/ui/sheet';
 import type { Area, Point } from 'react-easy-crop';
@@ -117,12 +117,14 @@ export default function PerfilPage() {
     // Add link sheet
     const [linkOpen, setLinkOpen] = useState(false);
     const [linkForm, setLinkForm] = useState({ type: 'instagram', label: 'Instagram', url: '' });
+    const [editingLinkId, setEditingLinkId] = useState<string | null>(null);
     const [linkSubmitting, setLinkSubmitting] = useState(false);
     const [linkError, setLinkError] = useState('');
 
     // Add work sheet
     const [workOpen, setWorkOpen] = useState(false);
     const [workForm, setWorkForm] = useState({ title: '', year: String(new Date().getFullYear()), company: '', role: '', link: '' });
+    const [editingWorkId, setEditingWorkId] = useState<string | null>(null);
     const [workSubmitting, setWorkSubmitting] = useState(false);
     const [workError, setWorkError] = useState('');
     const [pushEnabled, setPushEnabled] = useState(false);
@@ -268,12 +270,20 @@ export default function PerfilPage() {
         setLinkSubmitting(true); setLinkError('');
         const fd = new FormData();
         Object.entries(linkForm).forEach(([k, v]) => fd.append(k, v));
-        const res = await addLink(fd);
+        const res = editingLinkId ? await updateLink(editingLinkId, fd) : await addLink(fd);
         setLinkSubmitting(false);
         if (res.error) { setLinkError(res.error); return; }
         setLinkOpen(false);
+        setEditingLinkId(null);
         setLinkForm({ type: 'instagram', label: 'Instagram', url: '' });
         loadData();
+    }
+
+    function openEditLink(link: Link) {
+        setEditingLinkId(link.id);
+        setLinkError('');
+        setLinkForm({ type: link.type, label: link.label, url: link.url });
+        setLinkOpen(true);
     }
 
     async function handleDeleteLink(id: string) {
@@ -285,12 +295,26 @@ export default function PerfilPage() {
         setWorkSubmitting(true); setWorkError('');
         const fd = new FormData();
         Object.entries(workForm).forEach(([k, v]) => fd.append(k, v));
-        const res = await addWork(fd);
+        const res = editingWorkId ? await updateWork(editingWorkId, fd) : await addWork(fd);
         setWorkSubmitting(false);
         if (res.error) { setWorkError(res.error); return; }
         setWorkOpen(false);
+        setEditingWorkId(null);
         setWorkForm({ title: '', year: String(new Date().getFullYear()), company: '', role: '', link: '' });
         loadData();
+    }
+
+    function openEditWork(work: Work) {
+        setEditingWorkId(work.id);
+        setWorkError('');
+        setWorkForm({
+            title: work.title,
+            year: String(work.year),
+            company: work.company,
+            role: work.role,
+            link: work.link || '',
+        });
+        setWorkOpen(true);
     }
 
     async function handleDeleteWork(id: string) {
@@ -471,7 +495,7 @@ export default function PerfilPage() {
                 <div className="pf-section">
                     <div className="pf-section-header">
                         <span className="pf-section-title">Redes sociales</span>
-                        <button className="pf-add-btn" onClick={() => { setLinkError(''); setLinkOpen(true); }}>
+                        <button className="pf-add-btn" onClick={() => { setEditingLinkId(null); setLinkForm({ type: 'instagram', label: 'Instagram', url: '' }); setLinkError(''); setLinkOpen(true); }}>
                             <Plus size={16} />
                         </button>
                     </div>
@@ -488,9 +512,14 @@ export default function PerfilPage() {
                                         <span className="pf-list-label">{l.label}</span>
                                         <a href={l.url} target="_blank" rel="noopener noreferrer" className="pf-list-url">{l.url}</a>
                                     </div>
-                                    <button className="pf-del-btn" onClick={() => handleDeleteLink(l.id)}>
-                                        <Trash2 size={14} />
-                                    </button>
+                                    <div className="pf-item-actions">
+                                        <button className="pf-edit-item-btn" onClick={() => openEditLink(l)}>
+                                            <Pencil size={13} />
+                                        </button>
+                                        <button className="pf-del-btn" onClick={() => handleDeleteLink(l.id)}>
+                                            <Trash2 size={14} />
+                                        </button>
+                                    </div>
                                 </div>
                             ))}
                         </div>
@@ -501,7 +530,7 @@ export default function PerfilPage() {
                 <div className="pf-section">
                     <div className="pf-section-header">
                         <span className="pf-section-title">Trayectoria</span>
-                        <button className="pf-add-btn" onClick={() => { setWorkError(''); setWorkOpen(true); }}>
+                        <button className="pf-add-btn" onClick={() => { setEditingWorkId(null); setWorkForm({ title: '', year: String(new Date().getFullYear()), company: '', role: '', link: '' }); setWorkError(''); setWorkOpen(true); }}>
                             <Plus size={16} />
                         </button>
                     </div>
@@ -520,9 +549,14 @@ export default function PerfilPage() {
                                             <a href={w.link} target="_blank" rel="noopener noreferrer" className="pf-list-url">{w.link}</a>
                                         )}
                                     </div>
-                                    <button className="pf-del-btn" onClick={() => handleDeleteWork(w.id)}>
-                                        <Trash2 size={14} />
-                                    </button>
+                                    <div className="pf-item-actions">
+                                        <button className="pf-edit-item-btn" onClick={() => openEditWork(w)}>
+                                            <Pencil size={13} />
+                                        </button>
+                                        <button className="pf-del-btn" onClick={() => handleDeleteWork(w.id)}>
+                                            <Trash2 size={14} />
+                                        </button>
+                                    </div>
                                 </div>
                             ))}
                         </div>
@@ -604,7 +638,7 @@ export default function PerfilPage() {
             </Sheet>
 
             {/* Add link sheet */}
-            <Sheet open={linkOpen} onClose={() => setLinkOpen(false)} title="Agregar red social">
+            <Sheet open={linkOpen} onClose={() => { setLinkOpen(false); setEditingLinkId(null); }} title={editingLinkId ? 'Editar red social' : 'Agregar red social'}>
                 <label className="sheet-label">Plataforma</label>
                 <select className="sheet-select" value={linkForm.type}
                     onChange={e => {
@@ -626,12 +660,12 @@ export default function PerfilPage() {
                 {linkError && <p className="sheet-error">{linkError}</p>}
                 <button className="sheet-submit" onClick={handleAddLink}
                     disabled={!linkForm.label.trim() || !linkForm.url.trim() || linkSubmitting}>
-                    {linkSubmitting ? 'Agregando...' : 'Agregar'}
+                    {linkSubmitting ? 'Guardando...' : (editingLinkId ? 'Guardar cambios' : 'Agregar')}
                 </button>
             </Sheet>
 
             {/* Add work sheet */}
-            <Sheet open={workOpen} onClose={() => setWorkOpen(false)} title="Agregar trabajo">
+            <Sheet open={workOpen} onClose={() => { setWorkOpen(false); setEditingWorkId(null); }} title={editingWorkId ? 'Editar trabajo' : 'Agregar trabajo'}>
                 <label className="sheet-label">Obra / Producción *</label>
                 <input className="sheet-input" placeholder="Ej: El Rey León" value={workForm.title}
                     onChange={e => setWorkForm(f => ({ ...f, title: e.target.value }))} />
@@ -655,7 +689,7 @@ export default function PerfilPage() {
                 {workError && <p className="sheet-error">{workError}</p>}
                 <button className="sheet-submit" onClick={handleAddWork}
                     disabled={!workForm.title.trim() || !workForm.year || !workForm.company.trim() || !workForm.role.trim() || workSubmitting}>
-                    {workSubmitting ? 'Guardando...' : 'Agregar'}
+                    {workSubmitting ? 'Guardando...' : (editingWorkId ? 'Guardar cambios' : 'Agregar')}
                 </button>
             </Sheet>
 
@@ -795,6 +829,15 @@ export default function PerfilPage() {
     display: flex; align-items: center; justify-content: center;
     transition: background 0.15s;
   }
+    .pf-item-actions { display: flex; align-items: center; gap: 8px; }
+    .pf-edit-item-btn {
+        width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0;
+        background: rgba(212,160,23,0.12); border: none;
+        color: rgba(212,160,23,0.85); cursor: pointer;
+        display: flex; align-items: center; justify-content: center;
+        transition: background 0.15s;
+    }
+    .pf-edit-item-btn:hover { background: rgba(212,160,23,0.2); }
   .pf-del-btn:hover { background: rgba(239,68,68,0.15); color: #fca5a5; }
   .pf-logout-btn {
     width: 100%; display: flex; align-items: center; justify-content: center;
