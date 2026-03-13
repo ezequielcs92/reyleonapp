@@ -79,3 +79,56 @@ export async function deleteBusiness(id: string) {
         return { error: errorMessage(e, 'Error al eliminar el negocio') };
     }
 }
+
+export async function updateBusiness(id: string, formData: FormData) {
+    try {
+        const supabase = await createClient();
+        const { data: { user }, error: authErr } = await supabase.auth.getUser();
+        if (authErr || !user) return { error: 'No autenticado' };
+
+        const name = (formData.get('name') as string)?.trim();
+        const description = (formData.get('description') as string)?.trim();
+        const category_id = (formData.get('category_id') as string)?.trim();
+        const contact_phone = (formData.get('contact_phone') as string)?.trim();
+        const instagram_url = (formData.get('instagram_url') as string)?.trim();
+        const website_url = (formData.get('website_url') as string)?.trim();
+
+        if (!name || !description || !category_id) {
+            return { error: 'Por favor completá los campos obligatorios (*).' };
+        }
+
+        const payload = {
+            name,
+            description,
+            category_id,
+            contact_phone: contact_phone || null,
+            instagram_url: instagram_url || null,
+            website_url: website_url || null,
+        };
+
+        let { data, error } = await supabase.from('businesses')
+            .update(payload)
+            .eq('id', id)
+            .eq('owner_id', user.id)
+            .select()
+            .single();
+
+        // Compatibilidad con esquema antiguo que usa user_id en vez de owner_id
+        if (error && /owner_id/i.test(error.message)) {
+            const retry = await supabase.from('businesses')
+                .update(payload)
+                .eq('id', id)
+                .eq('user_id', user.id)
+                .select()
+                .single();
+
+            data = retry.data;
+            error = retry.error;
+        }
+
+        if (error) return { error: error.message };
+        return { success: true, data };
+    } catch (e: unknown) {
+        return { error: errorMessage(e, 'Error al actualizar el negocio') };
+    }
+}

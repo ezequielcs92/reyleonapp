@@ -2,8 +2,8 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
-import { addBusiness, deleteBusiness } from '@/actions/businesses';
-import { Plus, Phone, Instagram, Globe, Trash2, Store } from 'lucide-react';
+import { addBusiness, deleteBusiness, updateBusiness } from '@/actions/businesses';
+import { Plus, Phone, Instagram, Globe, Trash2, Store, Pencil } from 'lucide-react';
 import Sheet from '@/components/ui/sheet';
 
 type Category = { id: string; name: string; icon: string };
@@ -30,6 +30,7 @@ export default function NegociosPage() {
 
     // Create Modal
     const [createOpen, setCreateOpen] = useState(false);
+    const [editingBusinessId, setEditingBusinessId] = useState<string | null>(null);
     const [submitting, setSubmitting] = useState(false);
     const [createError, setCreateError] = useState('');
     const [form, setForm] = useState({ name: '', description: '', category_id: '', contact_phone: '', instagram_url: '', website_url: '' });
@@ -103,16 +104,33 @@ export default function NegociosPage() {
         const fd = new FormData();
         Object.entries(form).forEach(([k, v]) => fd.append(k, v));
         
-        const res = await addBusiness(fd);
+        const res = editingBusinessId
+            ? await updateBusiness(editingBusinessId, fd)
+            : await addBusiness(fd);
         setSubmitting(false);
 
         if (res.error) {
             setCreateError(res.error);
         } else {
             setCreateOpen(false);
+            setEditingBusinessId(null);
             setForm({ name: '', description: '', category_id: categories[0]?.id || '', contact_phone: '', instagram_url: '', website_url: '' });
             loadData(); // refresh list
         }
+    };
+
+    const openEdit = (business: Business) => {
+        setEditingBusinessId(business.id);
+        setCreateError('');
+        setForm({
+            name: business.name,
+            description: business.description,
+            category_id: business.category_id,
+            contact_phone: business.contact_phone || '',
+            instagram_url: business.instagram_url || '',
+            website_url: business.website_url || '',
+        });
+        setCreateOpen(true);
     };
 
     const handleDelete = async (id: string, name: string) => {
@@ -131,7 +149,7 @@ export default function NegociosPage() {
             <header className="b-header">
                 <span className="b-icon">🏬</span>
                 <span className="b-title">Negocios y Emprendimientos</span>
-                <button className="b-fab" onClick={() => { setCreateError(''); setCreateOpen(true); }}>
+                <button className="b-fab" onClick={() => { setEditingBusinessId(null); setCreateError(''); setForm({ name: '', description: '', category_id: categories[0]?.id || '', contact_phone: '', instagram_url: '', website_url: '' }); setCreateOpen(true); }}>
                     <Plus size={20} />
                 </button>
             </header>
@@ -177,9 +195,14 @@ export default function NegociosPage() {
                                         <div className="b-card-header">
                                             <span className="b-card-cat">{cat?.icon} {cat?.name}</span>
                                             {isMine && (
-                                                <button className="b-del-btn" onClick={() => handleDelete(bus.id, bus.name)}>
-                                                    <Trash2 size={13} />
-                                                </button>
+                                                <div className="b-card-actions">
+                                                    <button className="b-edit-btn" onClick={() => openEdit(bus)}>
+                                                        <Pencil size={13} />
+                                                    </button>
+                                                    <button className="b-del-btn" onClick={() => handleDelete(bus.id, bus.name)}>
+                                                        <Trash2 size={13} />
+                                                    </button>
+                                                </div>
                                             )}
                                         </div>
                                         <h2 className="b-card-name">{bus.name}</h2>
@@ -211,7 +234,7 @@ export default function NegociosPage() {
                 )}
             </main>
 
-            <Sheet open={createOpen} onClose={() => setCreateOpen(false)} title="Anunciar tu Emprendimiento">
+            <Sheet open={createOpen} onClose={() => { setCreateOpen(false); setEditingBusinessId(null); }} title={editingBusinessId ? 'Editar Emprendimiento' : 'Anunciar tu Emprendimiento'}>
                 <label className="sheet-label">Nombre del local / marca *</label>
                 <input className="sheet-input" placeholder="Ej: La Posta del Simba" value={form.name}
                     onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
@@ -241,7 +264,7 @@ export default function NegociosPage() {
                 {createError && <p className="sheet-error">{createError}</p>}
                 
                 <button className="sheet-submit" onClick={handleCreate} disabled={submitting || !form.name.trim() || !form.description.trim()}>
-                    {submitting ? 'Publicando...' : 'Publicar Negocio'}
+                    {submitting ? 'Guardando...' : (editingBusinessId ? 'Guardar cambios' : 'Publicar Negocio')}
                 </button>
             </Sheet>
 
@@ -317,6 +340,11 @@ const pageStyles = `
   .b-del-btn {
     background: transparent; border: none; color: rgba(239,68,68,0.5); cursor: pointer; padding: 4px; border-radius: 4px;
   }
+    .b-card-actions { display: flex; align-items: center; gap: 6px; }
+    .b-edit-btn {
+        background: transparent; border: none; color: rgba(212,160,23,0.75); cursor: pointer; padding: 4px; border-radius: 4px;
+    }
+    .b-edit-btn:hover { color: #d4a017; background: rgba(212,160,23,0.12); }
   .b-del-btn:hover { color: #ef4444; background: rgba(239,68,68,0.1); }
   .b-card-name { font-size: 1.1rem; color: #fff; margin: 0; font-weight: 600; line-height: 1.2; }
   .b-card-owner { font-size: 0.75rem; color: #d4a017; margin-top: 4px; }
