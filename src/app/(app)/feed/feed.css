@@ -92,9 +92,10 @@
   background: rgba(255,255,255,0.03);
   color: rgba(255,255,255,0.65);
   border-radius: 999px;
-  padding: 2px 8px;
-  display: inline-flex; align-items: center; gap: 4px;
-  font-size: 0.68rem; cursor: pointer;
+  padding: 2px 6px;
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: 0.65rem; cursor: pointer;
+  white-space: nowrap; flex-shrink: 0;
 }
 .card-pin-btn.pinned {
   border-color: rgba(212,160,23,0.45);
@@ -219,7 +220,7 @@
   padding: 12px 16px 8px;
   border-bottom: 1px solid rgba(255,255,255,0.06);
 }
-.compose-tabs { display: flex; gap: 4px; }
+.compose-tabs { display: flex; gap: 4px; flex-wrap: wrap; }
 .compose-tab {
   display: flex; align-items: center; gap: 5px;
   background: transparent; border: 1px solid rgba(255,255,255,0.08);

@@ -307,9 +307,12 @@ export default function AdminBusinessesPage() {
                 @keyframes spin { to { transform: rotate(360deg); } }
 
                 @media (max-width: 640px) {
-                    .page-header { flex-direction: column; align-items: stretch; }
+                    .page-header { flex-direction: column; align-items: stretch; gap: 12px; }
                     .search-box { max-width: 100%; }
                     .businesses-grid { grid-template-columns: 1fr; }
+                    .home-title { font-size: 1.45rem; }
+                    .card-header { flex-wrap: wrap; gap: 10px; }
+                    .status-badge { font-size: 0.7rem; }
                 }
 
                 .home-title { font-size: 1.8rem; font-weight: 800; margin: 0 0 4px; color: #fff; }

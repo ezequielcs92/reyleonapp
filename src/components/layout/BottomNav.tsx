@@ -52,8 +52,16 @@ export default function BottomNav() {
                     font-size: 10px;
                     font-weight: 500;
                     transition: color 0.15s;
-                    padding: 4px 0;
+                    padding: 4px 2px;
                     letter-spacing: 0.02em;
+                    min-width: 0;
+                    overflow: hidden;
+                }
+                .bottom-tab span {
+                    max-width: 100%;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    white-space: nowrap;
                 }
                 .bottom-tab.active { color: #d4a017; }
             `}</style>

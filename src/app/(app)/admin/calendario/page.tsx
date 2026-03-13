@@ -376,16 +376,18 @@ export default function AdminCalendarPage() {
                 @keyframes spin { to { transform: rotate(360deg); } }
 
                 @media (max-width: 640px) {
-                    .page-header { flex-direction: column; align-items: stretch; }
-                    .header-actions { flex-direction: column; }
+                    .page-header { flex-direction: column; align-items: stretch; gap: 12px; }
+                    .header-actions { flex-direction: column; gap: 10px; }
                     .search-box { width: 100%; }
                     .add-btn { width: 100%; justify-content: center; }
-                    .event-row { gap: 16px; padding: 16px; flex-wrap: wrap; }
-                    .event-date-cell { padding-right: 16px; width: 40px; border: none; }
+                    .event-row { gap: 12px; padding: 14px; }
+                    .event-date-cell { padding-right: 12px; width: 40px; border: none; }
                     .date-day { font-size: 1.4rem; }
+                    .event-title { font-size: 0.95rem; }
                     .event-meta { flex-direction: column; gap: 4px; }
                     .form-row { grid-template-columns: 1fr; }
                     .event-del-btn { margin-left: auto; }
+                    .home-title { font-size: 1.45rem; }
                 }
 
                 .home-title { font-size: 1.8rem; font-weight: 800; margin: 0 0 4px; color: #fff; }

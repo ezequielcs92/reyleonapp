@@ -15,6 +15,18 @@ export async function GET(request: Request) {
         const supabase = await createClient();
         const { error } = await supabase.auth.exchangeCodeForSession(code);
         if (!error) {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                const fullName = user.user_metadata?.full_name || user.user_metadata?.name || '';
+                const avatarUrl = user.user_metadata?.avatar_url || user.user_metadata?.picture || null;
+
+                await supabase.from('users').upsert({
+                    uid: user.id,
+                    email: user.email ?? '',
+                    full_name: fullName,
+                    photo_url: avatarUrl,
+                }, { onConflict: 'uid' });
+            }
             return NextResponse.redirect(`${baseUrl}${next}`);
         }
     }

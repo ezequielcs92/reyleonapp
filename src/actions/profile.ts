@@ -15,13 +15,15 @@ export async function updateProfile(formData: FormData) {
         const full_name = (formData.get('full_name') as string)?.trim();
         if (!full_name) return { error: 'El nombre es obligatorio' };
 
-        const { error } = await supabase.from('users').update({
+        const { error } = await supabase.from('users').upsert({
+            uid: user.id,
+            email: user.email ?? '',
             full_name,
             stage_name: (formData.get('stage_name') as string)?.trim() || null,
             bio: (formData.get('bio') as string)?.trim() || null,
             role_in_show: (formData.get('role_in_show') as string)?.trim() || null,
             birthdate: (formData.get('birthdate') as string)?.trim() || null,
-        }).eq('uid', user.id);
+        }, { onConflict: 'uid' });
 
         if (error) return { error: error.message };
         return { success: true };

@@ -321,14 +321,14 @@ export default function CalendarPage() {
 }
 
 const calStyles = `
-    .cal-root { min-height: 100dvh; background: #0c0a08; font-family: 'Poppins', sans-serif; padding-bottom: 80px; color: #fff; }
+    .cal-root { min-height: 100dvh; background: #0c0a08; font-family: 'Poppins', sans-serif; padding-bottom: 16px; color: #fff; }
     .cal-header { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 10px; padding: 0 16px; height: 56px; background: rgba(12,10,8,0.92); border-bottom: 1px solid rgba(255,255,255,0.06); backdrop-filter: blur(12px); }
     .cal-icon-header { color: #d4a017; }
     .cal-title { font-size: 1.1rem; font-weight: 700; flex: 1; margin: 0; }
     .cal-fab { width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, #d4a017, #b8860b); border: none; color: #0c0a08; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(212,160,23,0.3); }
     .cal-nav { display: flex; align-items: center; justify-content: space-between; padding: 16px; }
     .cal-nav-btn { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #fff; border-radius: 10px; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
-    .cal-current-month { font-size: 1.1rem; font-weight: 600; margin: 0; color: #d4a017; }
+    .cal-current-month { font-size: 1.1rem; font-weight: 600; margin: 0; color: #d4a017; flex: 1; text-align: center; min-width: 0; }
     
     .cal-grid-header { display: grid; grid-template-columns: repeat(7, 1fr); padding: 0 16px; margin-bottom: 8px; }
     .cal-day-label { text-align: center; font-size: 0.75rem; color: rgba(255,255,255,0.4); font-weight: 500; }
@@ -406,4 +406,18 @@ const calStyles = `
     .sheet-textarea { resize: none; }
     .sheet-error { background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.2); border-radius: 8px; padding: 8px 12px; color: #fca5a5; font-size: 0.78rem; margin: 0; }
     .sheet-submit { width: 100%; background: linear-gradient(135deg, #d4a017, #b8860b); border: none; border-radius: 12px; padding: 13px; color: #0c0a08; font-family: 'Poppins', sans-serif; font-size: 0.9rem; font-weight: 600; cursor: pointer; margin-top: 4px; }
+
+    @media (max-width: 380px) {
+        .cal-day { padding: 2px; }
+        .cal-day-num { font-size: 0.7rem; }
+        .cal-day.today .cal-day-num { width: 18px; height: 18px; font-size: 0.65rem; }
+        .cal-day-content { margin-top: 2px; gap: 1px; }
+        .cal-ev-item { width: 11px; height: 11px; }
+        .cal-grid-header { padding: 0 8px; }
+        .cal-grid { margin: 0 8px; }
+        .cal-day-label { font-size: 0.65rem; }
+        .cal-legend { gap: 8px; padding: 10px 8px; flex-wrap: wrap; }
+        .leg-item { font-size: 0.65rem; }
+        .cal-current-month { font-size: 0.95rem; }
+    }
 `;

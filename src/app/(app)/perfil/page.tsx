@@ -708,6 +708,7 @@ export default function PerfilPage() {
     padding: 3px 10px; border-radius: 20px; letter-spacing: 0.06em;
   }
   .badge-admin {
+    display: inline-flex; align-items: center; gap: 4px;
     background: rgba(212,160,23,0.12); color: #d4a017;
     border: 1px solid rgba(212,160,23,0.3); font-size: 0.62rem;
     font-weight: 600; padding: 3px 10px; border-radius: 20px;

@@ -18,7 +18,7 @@ function mapProfile(data: unknown): UserProfile | null {
         roleInShow: (d.role_in_show || d.roleInShow) as string | undefined,
         roles: (d.roles || []) as string[],
         skills: (d.skills || []) as string[],
-        birthdate: (d.birthdate || undefined) as string | undefined,
+        birthdate: (d.birthdate || d.birth_date || undefined) as string | undefined,
         createdAt: (d.created_at || d.createdAt) as string,
         updatedAt: (d.updated_at || d.updatedAt) as string,
     };
@@ -50,6 +50,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [loading, setLoading] = useState(true);
 
     const loadUserData = async (userId: string) => {
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+
         // Load user profile
         const { data: profileData } = await supabase
             .from('users')
@@ -59,24 +61,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         // Auto-create profile for Google/OAuth users on first sign-in
         if (!profileData) {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (user) {
-                const fullName = user.user_metadata?.full_name || user.user_metadata?.name || '';
-                await supabase.from('users').insert({
-                    uid: user.id,
-                    email: user.email,
+            if (authUser) {
+                const fullName = authUser.user_metadata?.full_name || authUser.user_metadata?.name || '';
+                const avatarUrl = authUser.user_metadata?.avatar_url || authUser.user_metadata?.picture || null;
+                await supabase.from('users').upsert({
+                    uid: authUser.id,
+                    email: authUser.email ?? '',
                     full_name: fullName,
+                    photo_url: avatarUrl,
                     roles: [],
                     skills: [],
                     created_at: new Date().toISOString(),
                     updated_at: new Date().toISOString(),
-                });
+                }, { onConflict: 'uid' });
                 const { data: newProfile } = await supabase
                     .from('users')
                     .select('*')
                     .eq('uid', userId)
                     .single();
                 setProfile(mapProfile(newProfile));
+            } else {
+                setProfile(null);
             }
         } else {
             setProfile(mapProfile(profileData));

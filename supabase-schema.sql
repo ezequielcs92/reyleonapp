@@ -48,6 +48,7 @@ CREATE TABLE posts (
     description TEXT NOT NULL,
     likes_count INTEGER DEFAULT 0,
     pinned BOOLEAN DEFAULT FALSE,
+    hidden_by_admin BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -70,6 +71,7 @@ CREATE TABLE polls (
     show_results TEXT NOT NULL CHECK (show_results IN ('always', 'after_vote', 'after_close')),
     closes_at TIMESTAMPTZ,
     pinned BOOLEAN DEFAULT FALSE,
+    hidden_by_admin BOOLEAN DEFAULT FALSE,
     total_votes INTEGER DEFAULT 0,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );

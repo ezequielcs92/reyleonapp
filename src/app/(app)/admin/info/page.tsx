@@ -401,9 +401,10 @@ export default function AdminInfoPage() {
                 }
 
                 @media (max-width: 720px) {
-                    .page-header { flex-direction: column; align-items: stretch; }
-                    .refresh-btn { justify-content: center; }
+                    .page-header { flex-direction: column; align-items: stretch; gap: 12px; }
+                    .refresh-btn { justify-content: center; width: 100%; }
                     .list-grid { grid-template-columns: 1fr; }
+                    .home-title { font-size: 1.45rem; }
                 }
             `}</style>
         </div>

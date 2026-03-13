@@ -165,7 +165,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
             {/* Main Content Area */}
             <main className="main-content">
-                <header className="page-header">
+                <header className="admin-topbar">
                     <div className="header-search">
                         {/* Space for future search or filters */}
                     </div>
@@ -239,7 +239,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
                 /* MAIN CONTENT */
                 .admin-wrapper .main-content { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-                .admin-wrapper .page-header { height: 80px; display: flex; align-items: center; justify-content: space-between; padding: 0 40px; background: rgba(8,7,5,0.5); backdrop-filter: blur(10px); position: sticky; top: 0; z-index: 90; }
+                .admin-wrapper .admin-topbar { height: 80px; display: flex; align-items: center; justify-content: space-between; padding: 0 40px; background: rgba(8,7,5,0.5); backdrop-filter: blur(10px); position: sticky; top: 0; z-index: 90; }
                 .admin-wrapper .header-actions { display: flex; align-items: center; gap: 12px; }
                 .admin-wrapper .action-btn { width: 40px; height: 40px; border-radius: 12px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); color: rgba(255,255,255,0.6); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; }
                 .admin-wrapper .action-btn:hover { background: rgba(255,255,255,0.08); color: #fff; border-color: rgba(212,160,23,0.3); }
@@ -251,7 +251,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
                 @media (max-width: 1024px) {
                     .admin-wrapper .desktop-sidebar { display: none; }
-                    .admin-wrapper .page-header { display: none; }
+                    .admin-wrapper .admin-topbar { display: none; }
                     .admin-wrapper .main-content { padding-top: 70px; }
                     .admin-wrapper .content-container { padding: 20px; }
 
