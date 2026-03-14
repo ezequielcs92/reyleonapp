@@ -15,8 +15,8 @@ export async function POST(request: NextRequest) {
         const description = (formData.get('description') as string)?.trim();
         const imageFile = formData.get('image') as File | null;
 
-        if (!description) {
-            return NextResponse.json({ error: 'El mensaje no puede estar vacío' }, { status: 400 });
+        if (!description && !imageFile) {
+            return NextResponse.json({ error: 'Agregá texto o una imagen para publicar' }, { status: 400 });
         }
 
         let imageUrl = null;
@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
             author_id: user.id,
             author_name: profile?.full_name || user.user_metadata?.full_name || 'Usuario',
             author_photo_url: profile?.photo_url || null,
-            description,
+            description: description || '',
             image_url: imageUrl,
             likes_count: 0,
             pinned: false,

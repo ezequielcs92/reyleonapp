@@ -32,6 +32,7 @@ export async function POST(request: NextRequest) {
                 type: body.type || 'single',
                 is_anonymous: body.isAnonymous === true,
                 show_results: 'always',
+                closes_at: body.closesAt || null,
                 pinned: false,
                 total_votes: 0,
             })

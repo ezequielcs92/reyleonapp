@@ -139,7 +139,7 @@ const PostCard = memo(function PostCard({ item, onLike, canPin, onTogglePin, can
                     )}
                     {item.hidden_by_admin && <span className="card-hidden-badge">Oculto</span>}
                 </div>
-                <p className="card-text">{item.description}</p>
+                {item.description?.trim() && <p className="card-text">{item.description}</p>}
                 {item.image_url && (
                     <div className="card-image-wrap" onDoubleClick={handleDoubleTap}>
                         <img src={item.image_url} alt="Imagen" className="card-image" loading="lazy" />
@@ -328,6 +328,7 @@ export default function FeedPage() {
     const [options, setOptions] = useState(['', '']);
     const [pollType, setPollType] = useState<'single' | 'multi'>('single');
     const [isAnon, setIsAnon] = useState(false);
+    const [closesDays, setClosesDays] = useState('7'); // Default 7 days
 
     const loadFeed = useCallback(async (quiet = false) => {
         if (!user) return;
@@ -677,8 +678,7 @@ export default function FeedPage() {
         setSubmitting(true); setSubmitError('');
         try {
             const fd = new FormData();
-            if (postText.trim()) fd.append('description', postText);
-            else fd.append('description', 'Imagen adjuunta'); // Fallback text if empty
+            fd.append('description', postText.trim());
 
             if (imageFile) {
                 fd.append('image', imageFile);
@@ -706,6 +706,13 @@ export default function FeedPage() {
         if (!question.trim() || validOpts.length < 2) return;
         setSubmitting(true); setSubmitError('');
         try {
+            let closesAt = null;
+            if (closesDays !== 'never') {
+                const date = new Date();
+                date.setDate(date.getDate() + parseInt(closesDays));
+                closesAt = date.toISOString();
+            }
+
             const res = await fetch('/api/feed/poll', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -714,12 +721,14 @@ export default function FeedPage() {
                     options: validOpts,
                     type: pollType,
                     isAnonymous: isAnon,
+                    closesAt
                 }),
             });
             const data = await res.json();
             if (data?.error) { setSubmitError(data.error); return; }
             setQuestion('');
             setOptions(['', '']);
+            setClosesDays('7');
             setComposeOpen(false);
             loadFeed(true);
         } catch {
@@ -917,6 +926,16 @@ export default function FeedPage() {
                                             onChange={e => setIsAnon(e.target.checked)} />
                                         Anónima
                                     </label>
+                                    <div className="compose-poll-duration">
+                                        <span>Cierra en:</span>
+                                        <select value={closesDays} onChange={e => setClosesDays(e.target.value)}>
+                                            <option value="1">1 día</option>
+                                            <option value="3">3 días</option>
+                                            <option value="7">7 días</option>
+                                            <option value="30">30 días</option>
+                                            <option value="never">Nunca</option>
+                                        </select>
+                                    </div>
                                 </div>
 
                                 {submitError && <p className="compose-error">{submitError}</p>}
